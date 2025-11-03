@@ -26,10 +26,11 @@ MODEL_KAGGLE_PATH = os.path.join(MODELS_DIR, "model_kaggle.joblib")
 MODEL_C3_PATH = os.path.join(MODELS_DIR, "model_c3.joblib")
 MODEL_FEA_PATH = os.path.join(MODELS_DIR, "model_fea.joblib")
 MODEL_FATIGUE_PATH = os.path.join(MODELS_DIR, "model_fatigue.joblib")
+MODEL_ACCURACY_PATH = os.path.join(MODELS_DIR, "model_accuracy.joblib") # v5: New Model
 FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
 
 # --- FastAPI App Initialization ---
-app = FastAPI(title="FDM 3D Print Property Simulator API (v4)")
+app = FastAPI(title="FDM 3D Print Property Simulator API (v5)")
 
 # Configure CORS
 app.add_middleware(
@@ -45,6 +46,7 @@ model_kaggle = None
 model_c3 = None
 model_fea = None
 model_fatigue = None
+model_accuracy = None # v5: New Model
 fea_target_names = []
 materials_database = {}
 
@@ -114,6 +116,18 @@ class FatigueInput(GlobalInputs):
 class FatigueOutput(PredictionBase):
     Fatigue_Lifetime: float
 
+# --- v5: Model 5: Dimensional Accuracy ---
+class AccuracyInput(GlobalInputs):
+    Layer_Thickness_mm: float
+    Build_Orientation_deg: int
+    Infill_Density_percent: int
+    Number_of_Contours: int
+
+class AccuracyOutput(PredictionBase):
+    Var_Length_percent: float
+    Var_Width_percent: float
+    Var_Thickness_percent: float
+
 # --- v4: Optimization Pydantic Models ---
 class OptimizationObjective(BaseModel):
     name: str # e.g., "tensile_strength", "estimated_cost_usd"
@@ -160,13 +174,11 @@ def calculate_cost_time(
     part_mass_g = inputs.part_mass_g
     filament_cost_kg = inputs.filament_cost_kg
     
-    # --- Cost Calculation (CHANGED) ---
-    # This is now much simpler
+    # --- Cost Calculation ---
     part_mass_kg = part_mass_g / 1000.0
     estimated_cost_usd = part_mass_kg * filament_cost_kg
 
-    # --- Time Calculation (CHANGED) ---
-    # Need to get density to convert mass back to volume for time estimation
+    # --- Time Calculation ---
     material_density = get_material_density(inputs.material_name)
     if material_density == 0:
         material_density = 1.25 # Prevent division by zero
@@ -183,7 +195,6 @@ def calculate_cost_time(
         infill_percent *= 100 # Convert 0.5 to 50
     
     # This is a very rough estimate.
-    # (Volume to extrude) / (Flow rate)
     extrusion_width_mm = 0.4 
     volume_to_extrude_mm3 = part_volume_cm3 * (infill_percent / 100.0) * 1000.0 # cm3 to mm3
     
@@ -204,7 +215,7 @@ def calculate_cost_time(
 @app.on_event("startup")
 async def startup_event():
     """Load all models and data on server startup."""
-    global model_kaggle, model_c3, model_fea, model_fatigue, fea_target_names, materials_database
+    global model_kaggle, model_c3, model_fea, model_fatigue, model_accuracy, fea_target_names, materials_database
     
     # Load Materials JSON
     try:
@@ -245,13 +256,20 @@ async def startup_event():
         print(f"Successfully loaded model 'fatigue' from {MODEL_FATIGUE_PATH}")
     except Exception as e:
         print(f"Warning: Model file not found at {MODEL_FATIGUE_PATH}. Endpoint for 'fatigue' will be disabled. Error: {e}")
+        
+    # v5: Load Model 5: Accuracy
+    try:
+        model_accuracy = joblib.load(MODEL_ACCURACY_PATH)
+        print(f"Successfully loaded model 'accuracy' from {MODEL_ACCURACY_PATH}")
+    except Exception as e:
+        print(f"Warning: Model file not found at {MODEL_ACCURACY_PATH}. Endpoint for 'accuracy' will be disabled. Error: {e}")
 
 
 # --- API Endpoints ---
 
 @app.get("/")
 def read_root():
-    return {"message": "FDM Property Simulator API (v4) is running."}
+    return {"message": "FDM Property Simulator API (v5) is running."}
 
 @app.get("/materials", response_model=Dict[str, dict])
 async def get_materials():
@@ -383,6 +401,35 @@ async def predict_fatigue(inputs: FatigueInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
 
+# --- v5: Endpoint 5: Accuracy (Prediction) ---
+@app.post("/predict/accuracy", response_model=AccuracyOutput)
+async def predict_accuracy(inputs: AccuracyInput):
+    if model_accuracy is None:
+        raise HTTPException(status_code=503, detail="Accuracy model is not loaded.")
+        
+    try:
+        # 1. Get cost/time info
+        param_map = {
+            'infill': inputs.Infill_Density_percent,
+            'layer_height': inputs.Layer_Thickness_mm,
+            'speed': 60.0 # Accuracy model doesn't use speed, use default
+        }
+        cost_time_results = calculate_cost_time(inputs, param_map)
+
+        # 2. Get model prediction
+        features = pd.DataFrame([inputs.dict(exclude={'part_mass_g', 'filament_cost_kg', 'material_name'})])
+        prediction = model_accuracy.predict(features)[0]
+        
+        # 3. Combine and return
+        return AccuracyOutput(
+            Var_Length_percent=prediction[0],
+            Var_Width_percent=prediction[1],
+            Var_Thickness_percent=prediction[2],
+            **cost_time_results
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
+
 # --- v4: Optimization Endpoint ---
 
 # Define problem parameters for each model
@@ -401,6 +448,16 @@ KAGGLE_OPT_PARAMS = {
         ("infill_pattern", ["grid", "honeycomb"]),
         ("material", ["abs", "pla"])
     ]
+}
+# v5: Add config for Accuracy model
+ACCURACY_OPT_PARAMS = {
+    "numeric": [
+        ("Layer_Thickness_mm", 0.1, 0.4),
+        ("Build_Orientation_deg", 0, 90),
+        ("Infill_Density_percent", 80, 100),
+        ("Number_of_Contours", 1, 3)
+    ],
+    "categorical": [] # No categorical variables for this model
 }
 # Add other models as needed...
 
@@ -441,7 +498,17 @@ class OptimizationProblem(Problem):
         self.n_obj = len(request.objectives)
         self.n_constr = len(request.constraints)
         
-        super().__init__(n_var=n_var, n_obj=self.n_obj, n_constr=self.n_constr, xl=xl, xu=xu, vtype=float) # Treat all as float for simplicity, then round categorical
+        # Determine if variables are integers
+        self.vtype = [float] * n_numeric
+        for name, _ in param_config.get("categorical", []):
+             self.vtype.append(int)
+
+        # Handle integer numeric variables (like 'wall_thickness')
+        for i, (name, _, _) in enumerate(param_config["numeric"]):
+            if name in ["wall_thickness", "infill_density", "nozzle_temperature", "bed_temperature", "print_speed", "fan_speed", "Build_Orientation_deg", "Infill_Density_percent", "Number_of_Contours"]:
+                self.vtype[i] = int
+
+        super().__init__(n_var=n_var, n_obj=self.n_obj, n_constr=self.n_constr, xl=xl, xu=xu) # vtype=self.vtype - let's round them instead
 
     def _evaluate(self, x, out, *args, **kwargs):
         # x is a 2D array (n_solutions, n_vars)
@@ -453,9 +520,12 @@ class OptimizationProblem(Problem):
         solutions_df_list = []
         for sol_vector in x:
             sol_dict = {}
-            # Decode numeric
+            # Decode numeric and round integers
             for i, name in enumerate(self.numeric_params):
-                sol_dict[name] = sol_vector[i]
+                val = sol_vector[i]
+                if self.vtype[i] == int:
+                    val = int(round(val))
+                sol_dict[name] = val
             # Decode categorical
             for i, name in enumerate(self.categorical_params):
                 cat_index = int(round(sol_vector[n_numeric + i]))
@@ -465,62 +535,75 @@ class OptimizationProblem(Problem):
         features_df = pd.DataFrame(solutions_df_list)
         
         # 2. Get model predictions for all solutions in a batch
-        # This assumes the model's `predict` method matches the outputs
+        predictions = self.model.predict(features_df)
+        pred_map = {}
+
+        # 3. Calculate cost/time and map predictions for the specific model
         if self.model_name == "kaggle":
-            predictions = self.model.predict(features_df) # (n_sols, 3)
-            # Map predictions to names
-            pred_map = {
-                "tensile_strength": predictions[:, 0],
-                "roughness": predictions[:, 1],
-                "elongation": predictions[:, 2]
+            pred_map["tensile_strength"] = predictions[:, 0]
+            pred_map["roughness"] = predictions[:, 1]
+            pred_map["elongation"] = predictions[:, 2]
+            param_map_key = {
+                'infill': 'infill_density',
+                'layer_height': 'layer_height',
+                'speed': 'print_speed'
             }
-            # Also calculate cost/time for all solutions
-            cost_time_list = []
-            for i in range(n_sols):
-                param_map = {
-                    'infill': features_df.loc[i, 'infill_density'],
-                    'layer_height': features_df.loc[i, 'layer_height'],
-                    'speed': features_df.loc[i, 'print_speed']
-                }
-                cost_time = calculate_cost_time(self.request.global_inputs, param_map)
-                cost_time_list.append(cost_time)
-            
-            cost_time_df = pd.DataFrame(cost_time_list)
-            pred_map["estimated_cost_usd"] = cost_time_df["estimated_cost_usd"].values
-            pred_map["estimated_print_time_min"] = cost_time_df["estimated_print_time_min"].values
+        elif self.model_name == "accuracy":
+            pred_map["Var_Length_percent"] = predictions[:, 0]
+            pred_map["Var_Width_percent"] = predictions[:, 1]
+            pred_map["Var_Thickness_percent"] = predictions[:, 2]
+            param_map_key = {
+                'infill': 'Infill_Density_percent',
+                'layer_height': 'Layer_Thickness_mm',
+                'speed': 60.0 # Use default
+            }
         else:
             # Placeholder for other models
-            # You would need to implement this logic for C3, FEA, etc.
-            # For now, just return zeros if not kaggle
-            pred_map = {}
             for obj in self.request.objectives:
                 pred_map[obj.name] = np.zeros(n_sols)
+            param_map_key = {'infill': 80.0, 'layer_height': 0.2, 'speed': 60.0}
 
-        # 3. Calculate objectives (F)
+        # Calculate cost/time for all solutions
+        cost_time_list = []
+        for i in range(n_sols):
+            param_map = {}
+            for key, val_key in param_map_key.items():
+                if isinstance(val_key, str):
+                    param_map[key] = features_df.loc[i, val_key]
+                else:
+                    param_map[key] = val_key # Use default value
+            
+            cost_time = calculate_cost_time(self.request.global_inputs, param_map)
+            cost_time_list.append(cost_time)
+        
+        cost_time_df = pd.DataFrame(cost_time_list)
+        pred_map["estimated_cost_usd"] = cost_time_df["estimated_cost_usd"].values
+        pred_map["estimated_print_time_min"] = cost_time_df["estimated_print_time_min"].values
+
+        # 4. Calculate objectives (F)
         f_matrix = np.zeros((n_sols, self.n_obj))
         for i, obj in enumerate(self.request.objectives):
             if obj.name not in pred_map:
-                # Handle error if objective name is invalid
-                f_matrix[:, i] = 0.0 # Or raise error
+                f_matrix[:, i] = 0.0 # Objective not found
             else:
                 values = pred_map[obj.name]
                 if obj.goal == "maximize":
-                    f_matrix[:, i] = -values # pymoo minimizes by default, so flip sign
+                    f_matrix[:, i] = -values # pymoo minimizes by default
                 else:
                     f_matrix[:, i] = values
         
         out["F"] = f_matrix
 
-        # 4. Calculate constraints (G)
+        # 5. Calculate constraints (G)
         if self.n_constr > 0:
             g_matrix = np.zeros((n_sols, self.n_constr))
             for i, constr in enumerate(self.request.constraints):
                 current_values = features_df[constr.name].values
                 if constr.operator == "lt":
-                    # Constraint is g(x) <= 0, so we want current - value <= 0
+                    # g(x) <= 0
                     g_matrix[:, i] = current_values - constr.value
                 elif constr.operator == "gt":
-                    # Constraint is g(x) >= 0, so we want value - current <= 0
+                    # g(x) >= 0  ->  -g(x) <= 0
                     g_matrix[:, i] = constr.value - current_values
             out["G"] = g_matrix
 
@@ -534,6 +617,9 @@ async def optimize(request: OptimizationRequest):
     if request.model_name == "kaggle":
         model = model_kaggle
         param_config = KAGGLE_OPT_PARAMS
+    elif request.model_name == "accuracy":
+        model = model_accuracy
+        param_config = ACCURACY_OPT_PARAMS
     # Add 'elif request.model_name == "c3":' etc. here
         
     if model is None:
@@ -557,7 +643,7 @@ async def optimize(request: OptimizationRequest):
         termination = get_termination("n_gen", 40)
 
         # 4. Run the optimization
-        print("Starting optimization...")
+        print(f"Starting optimization for {request.model_name}...")
         res = minimize(problem,
                        algorithm,
                        termination,
@@ -569,12 +655,7 @@ async def optimize(request: OptimizationRequest):
         # 5. Format and return the results
         results = []
         
-        # res.X = inputs (n_solutions, n_vars)
-        # res.F = outputs (n_solutions, n_objectives)
-        
         n_numeric = len(param_config["numeric"])
-        
-        # Get the objective values from the result
         objective_values = res.F
         
         for i, sol_vector in enumerate(res.X):
@@ -584,8 +665,10 @@ async def optimize(request: OptimizationRequest):
             
             # Decode input parameters
             for j, (name, _, _) in enumerate(param_config["numeric"]):
-                # Round numeric values to reasonable precision
-                inputs[name] = round(sol_vector[j], 2)
+                val = sol_vector[j]
+                if problem.vtype[j] == int: # Use vtype from problem
+                    val = int(round(val))
+                inputs[name] = round(val, 2)
             for j, (name, _) in enumerate(param_config["categorical"]):
                 cat_index = int(round(sol_vector[n_numeric + j]))
                 inputs[name] = param_config["categorical"][j][1][cat_index] # Get string value

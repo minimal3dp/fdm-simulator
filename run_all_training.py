@@ -12,7 +12,6 @@ from sklearn.multioutput import MultiOutputRegressor
 import re # Import regex library
 
 # --- Configuration ---
-# ... (rest of the configuration is correct) ...
 DATA_DIR = "data"
 RAW_DIR = os.path.join(DATA_DIR, "raw")
 PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
@@ -27,6 +26,7 @@ PATH_KAGGLE_RAW = os.path.join(RAW_DIR, "data.csv")
 PATH_C3_RAW = os.path.join(RAW_DIR, "C3-RAW DATA.csv")
 PATH_FEA_RAW = os.path.join(RAW_DIR, "3D_Printing_Data.xlsx - Sheet1.csv")
 PATH_FATIGUE_RAW = os.path.join(RAW_DIR, "1-s2.0-S2352340922000580-mmc1.xlsx - Data.csv")
+PATH_ACCURACY_RAW = os.path.join(RAW_DIR, "dimensional_accuracy_deswal.csv") # v5: New Path
 
 PATH_C3_PROCESSED = os.path.join(PROCESSED_DIR, "c3_processed_data.csv")
 
@@ -34,6 +34,7 @@ MODEL_KAGGLE_PATH = os.path.join(MODELS_DIR, "model_kaggle.joblib")
 MODEL_C3_PATH = os.path.join(MODELS_DIR, "model_c3.joblib")
 MODEL_FEA_PATH = os.path.join(MODELS_DIR, "model_fea.joblib")
 MODEL_FATIGUE_PATH = os.path.join(MODELS_DIR, "model_fatigue.joblib")
+MODEL_ACCURACY_PATH = os.path.join(MODELS_DIR, "model_accuracy.joblib") # v5: New Model
 
 # Path for FEA target names
 FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
@@ -160,10 +161,8 @@ def train_fea_model():
         def clean_col_name(col_name):
             new_col = col_name.strip()
             new_col = new_col.replace(' ', '_').replace(':', '').replace("'", "")
-            # *** THIS IS THE FIX ***
-            # The built-in str.replace() does not take a regex= argument.
+            # Replace ( and ) with _ and remove duplicates
             new_col = new_col.replace('(', '_').replace(')', '')
-            # ***********************
             new_col = new_col.replace('__', '_')
             # Remove trailing underscores
             if new_col.endswith('_'):
@@ -276,6 +275,42 @@ def train_fatigue_model():
     except Exception as e:
         print(f"Error training Fatigue model: {e}")
 
+# --- v5: Model 5: Dimensional Accuracy ---
+def train_accuracy_model():
+    """Trains the Dimensional Accuracy model (Deswal et al.)."""
+    print("--- Training Accuracy Model ---")
+    try:
+        df = pd.read_csv(PATH_ACCURACY_RAW)
+        
+        # Define features and targets
+        feature_cols = [
+            "Layer_Thickness_mm", "Build_Orientation_deg", 
+            "Infill_Density_percent", "Number_of_Contours"
+        ]
+        target_cols = [
+            "Var_Length_percent", "Var_Width_percent", "Var_Thickness_percent"
+        ]
+        
+        # Drop rows with NaN values in the relevant columns
+        df = df.dropna(subset=feature_cols + target_cols)
+        
+        X = df[feature_cols]
+        y = df[target_cols]
+
+        # Simple pipeline (all features are numeric)
+        pipeline = Pipeline(steps=[('scaler', StandardScaler()),
+                                   ('model', RandomForestRegressor(n_estimators=100, random_state=42))])
+        
+        print("Training Accuracy model...")
+        pipeline.fit(X, y)
+        joblib.dump(pipeline, MODEL_ACCURACY_PATH)
+        print(f"Accuracy model saved to {MODEL_ACCURACY_PATH}")
+
+    except FileNotFoundError:
+        print(f"Error: Raw data file not found at {PATH_ACCURACY_RAW}")
+    except Exception as e:
+        print(f"Error training Accuracy model: {e}")
+
 
 # --- Main execution ---
 def main():
@@ -292,7 +327,7 @@ def main():
         if not os.path.exists(PATH_C3_PROCESSED):
             if not process_c3_data():
                 print("C3 data processing failed. Skipping C3 model training.")
-                return # Stop if processing fails
+                return
         train_c3_model()
     else:
         print("--- C3 Model already trained. Skipping. ---")
@@ -309,6 +344,12 @@ def main():
         train_fatigue_model()
     else:
         print("--- Fatigue Model already trained. Skipping. ---")
+        
+    # v5: Accuracy Model
+    if not os.path.exists(MODEL_ACCURACY_PATH):
+        train_accuracy_model()
+    else:
+        print("--- Accuracy Model already trained. Skipping. ---")
 
     print("\nAll models checked/trained.")
     print("Starting FastAPI server...")
