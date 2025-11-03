@@ -1,52 +1,52 @@
-DM 3D Print Property Simulator (v5)
+FDM 3D Print Property Simulator (v6)
 
-This application is a multi-model simulator and optimizer for Fused Deposition Modeling (FDM) 3D printing. It uses several machine learning models trained on published research data to predict the mechanical properties, dimensional accuracy, and cost/time of a print before you print it.
+This application is a multi-model simulator and optimizer for Fused Deposition Modeling (FDM) 3D printing. It uses a Python (FastAPI) backend to run several machine learning models trained on published research data. The frontend is a single, static HTML file that provides a UI for simulating properties and optimizing parameters.
 
-It also features a "v4" multi-objective genetic algorithm optimizer to help you find the best print settings for your specific goals.
+This "v6" update adds a new model for Warp Deformation.
 
 Project Structure
 
-Your project must be organized in this exact folder structure for the scripts to work.
+Your project must be organized in this exact structure for the scripts to work:
 
 fdm-simulator/
 │
 ├── .venv/                   # Your UV virtual environment
 │
 ├── data/
-│   ├── raw/                 # <-- PLACE ALL 5 RAW CSVs HERE
+│   ├── raw/                 # <-- PLACE ALL 6 RAW CSVs HERE
 │   │   ├── data.csv         # (Kaggle dataset)
-│   │   ├── C3-RAW DATA.csv  # (Wang et al. dataset)
-│   │   ├── 3D_Printing_Data.xlsx - Sheet1.csv  # (Lee & Tucker FEA dataset)
-│   │   ├── 1-s2.0-S2352340922000580-mmc1.xlsx - Data.csv # (Azadi et al. Fatigue dataset)
-│   │   └── dimensional_accuracy_deswal.csv # (v5: Deswal et al. Accuracy dataset)
+│   │   ├── C3-RAW DATA.csv  # (C3 dataset)
+│   │   ├── 3D_Printing_Data.xlsx - Sheet1.csv  # (FEA dataset)
+│   │   ├── 1-s2.0-S2352340922000580-mmc1.xlsx - Data.csv # (Fatigue dataset)
+│   │   ├── dimensional_accuracy_deswal.csv # (Accuracy dataset)
+│   │   └── warpage_data_nazan.csv          # (v6: Warpage dataset)
 │   │
-│   └── processed/           # (This folder is created by the script)
+│   └── processed/           # (This folder will be created)
 │       └── c3_processed_data.csv
 │
-├── models/                  # (This folder is created by the script)
+├── models/                  # (This folder will be created)
 │   ├── model_kaggle.joblib
 │   ├── model_c3.joblib
 │   ├── model_fea.joblib
 │   ├── fea_target_names.joblib
 │   ├── model_fatigue.joblib
-│   └── model_accuracy.joblib # (v5: New model)
+│   ├── model_accuracy.joblib
+│   └── model_warpage.joblib   # (v6: New model)
 │
-├── pyproject.toml           # Python dependencies
-├── run_all_training.py      # RUN THIS FIRST
+├── run_all_training.py      # RUN THIS ONCE
 ├── main.py                  # The Python backend server
-├── fdm_simulator.html       # The frontend (open this in your browser)
-└── materials.json           # Filament datasheet properties
+├── fdm_simulator.html       # The frontend (open in browser)
+├── pyproject.toml           # Python dependencies
+└── materials.json           # Filament datasheet
 
 
-Quick Start: How to Run
+Setup & Execution (3 Steps)
 
-Prerequisite: You must have uv installed (pip install uv).
+Step 1: Create Environment & Install Dependencies
 
-Step 1: Set Up the Environment
+Open your terminal in the fdm-simulator/ root folder.
 
-Open your terminal in this project's root folder (fdm-simulator/).
-
-Create a new virtual environment:
+Create a new virtual environment using uv:
 
 uv venv
 
@@ -55,70 +55,79 @@ Activate the environment:
 
 macOS/Linux: source .venv/bin/activate
 
-Windows: .venv\Scripts\activate
+Windows (PowerShell): .venv\Scripts\Activate.ps1
 
 Install all Python dependencies from the pyproject.toml file:
 
-uv pip install .
+uv pip install -e .
 
+
+(This command installs pymoo for optimization, fastapi for the server, and scikit-learn/pandas for the models).
 
 Step 2: Place Raw Data
 
-Download all 5 raw datasets and place them inside the data/raw/ folder, ensuring their filenames match the project structure exactly.
+Place all 6 of your raw .csv data files into the data/raw/ folder, as shown in the project structure diagram.
 
-Step 3: Train Models & Run Server
+Step 3: Run the Application
 
-Run the unified training script. This script will automatically:
+This application is now a single-command process.
 
-Check for existing models.
-
-Train any models that are missing (this may take a few minutes the first time).
-
-Once all models are trained, it will automatically start the backend API server.
+While in your activated environment, run the main training script:
 
 python run_all_training.py
 
 
-Keep this terminal running. It is now serving your models at http://127.0.0.1:8000.
+What this script does:
 
-Step 4: Use the Application
+It will "smartly" check for all 6 ML models in the models/ folder.
 
-Go to the project folder and double-click the fdm_simulator.html file to open it in your web browser.
+If any models are missing, it will automatically process the raw data and train them, saving the .joblib files.
 
-The application (running from a file://... address) will connect to your server (running at http://127.0.0.1:8000) and will be fully functional.
+Once all models are verified, it will automatically launch the FastAPI server.
 
-Application Features (v5)
+You will see the output:
 
-1. Global Print Settings
+All models checked/trained.
+Starting FastAPI server...
+INFO:     Uvicorn running on [http://127.0.0.1:8000](http://127.0.0.1:8000) (Press CTRL+C to quit)
 
-These inputs are used by all models to calculate cost and time:
 
-Filament Used (g): Get this value from your slicer's preview.
+Do not close this terminal. The server is now running.
 
-Filament Cost ($/kg): The price you paid for a 1kg spool.
+To use the app: Open the fdm_simulator.html file directly in your web browser (e.g., by double-clicking it).
 
-2. "Simulator" Tab
+Application Features (v6)
 
-This tab allows you to run "what-if" scenarios for five different engineering models.
+1. Simulator Tab
 
-Kaggle Model: A general-purpose model for PLA/ABS predicting Tensile Strength, Roughness, and Elongation.
+A "what-if" tool to see how parameters affect outcomes. It now contains 6 models:
 
-C3 Model: A specialized model for PLA predicting Tensile Strength and Elongation based on the (Wang et al.) dataset.
+Kaggle Model: Predicts Tensile Strength, Roughness, and Elongation.
 
-FEA Material Card: An advanced model for engineers based on the (Lee & Tucker) dataset. It predicts the full anisotropic material card (100+ properties) needed for professional FEA software.
+Warp Deformation (New): Predicts Warpage (mm) based on the Nazan et al. dataset.
 
-Fatigue Lifetime Model: A durability model for PLA based on the (Azadi et al.) dataset. It predicts how many Cycles to Failure a part can withstand at a given stress level.
+Dimensional Accuracy: Predicts % Variation in Length, Width, and Thickness.
 
-Dimensional Accuracy Model (v5): A new model for PLA based on the (Deswal et al.) dataset. It predicts the % Variation in Length, Width, and Thickness, allowing you to optimize for dimensional precision.
+Fatigue Lifetime: Predicts how many Cycles a part can withstand.
 
-3. "Optimizer" Tab
+C3 Model: Predicts Tensile Strength and Elongation.
 
-This is a powerful "v4" feature that runs a genetic algorithm (NSGA-II) on the backend to find the best possible settings for your goals.
+FEA Material Card: Predicts the full anisotropic material card for professional FEA software.
 
-Select Model: Choose either the "Kaggle" or "Dimensional Accuracy" model (others are not yet supported).
+2. Optimizer Tab
 
-Define Objectives: Tell the app what you want to achieve (e.g., "Maximize: Tensile Strength" and "Minimize: Estimated Print Time").
+A "what's-best" tool to find the optimal settings for your goals.
 
-Define Constraints: Set hard limits (e.g., "Infill Density must be <= 50%").
+Select a model (e.g., "Kaggle", "Dimensional Accuracy", or "Warp Deformation").
 
-Run Optimization: The app runs thousands of simulations on the server and returns the Top 5 "best trade-off" solutions (the Pareto front) that balance your goals.
+Select your objectives (e.g., "Minimize: Warpage (mm)" and "Minimize: Print Time").
+
+The app runs a genetic algorithm (NSGA-II) to find the "Top 5" best trade-off solutions.
+
+3. Global Settings
+
+Filament Used (g): Enter the part weight from your slicer.
+
+Filament Cost ($/kg): Enter your spool cost.
+
+All simulation and optimization results will automatically include Estimated Cost and Estimated Print Time.

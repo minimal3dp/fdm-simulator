@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FDM 3D Print Property Simulator (v5)</title>
+    <title>FDM 3D Print Property Simulator (v6)</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load three.js for 3D viewer -->
@@ -102,29 +102,21 @@
         }
 
         /* Tab styles */
-        .tab-btn {
+        .tab-button {
             padding: 0.5rem 1rem;
-            font-weight: 500;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 2px solid transparent;
-        }
-
-        .tab-btn.active {
-            background-color: #3b82f6;
-            color: white;
-        }
-
-        .tab-btn:not(.active) {
+            font-size: 1rem;
+            font-weight: 600;
             color: #9ca3af;
-            background-color: #374151;
-            /* gray-700 */
+            /* gray-400 */
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
         }
 
-        .tab-btn:not(.active):hover {
-            background-color: #4b5563;
-            /* gray-600 */
+        .tab-button.active {
+            color: #3b82f6;
+            /* blue-500 */
+            border-bottom-color: #3b82f6;
         }
 
         .tab-content {
@@ -158,35 +150,59 @@
             /* gray-700 */
         }
 
-        /* Tooltip */
+        /* Tooltip styles */
         .tooltip {
             position: relative;
             display: inline-block;
+            cursor: help;
         }
 
-        .tooltip .tooltiptext {
+        .tooltip .tooltip-text {
             visibility: hidden;
-            width: 220px;
+            width: max-content;
+            max-width: 250px;
             background-color: #1f2937;
+            /* gray-800 */
             color: #fff;
             text-align: center;
             border-radius: 6px;
-            padding: 5px;
+            padding: 8px;
             position: absolute;
             z-index: 10;
             bottom: 125%;
             left: 50%;
-            margin-left: -110px;
+            transform: translateX(-50%);
             opacity: 0;
-            transition: opacity 0.3s;
+            transition: opacity 0.2s;
             font-size: 0.75rem;
-            line-height: 1.25;
+            font-weight: 400;
+            pointer-events: none;
             border: 1px solid #374151;
+            /* gray-700 */
         }
 
-        .tooltip:hover .tooltiptext {
+        .tooltip:hover .tooltip-text {
             visibility: visible;
             opacity: 1;
+        }
+
+        /* Optimizer table */
+        .optimizer-table th,
+        .optimizer-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #374151;
+            /* gray-700 */
+        }
+
+        .optimizer-table th {
+            background-color: #374151;
+            /* gray-700 */
+        }
+
+        .optimizer-table td {
+            background-color: #1f2937;
+            /* gray-800 */
         }
     </style>
 </head>
@@ -196,65 +212,61 @@
 
         <!-- Header -->
         <header class="mb-6">
-            <h1 class="text-3xl font-bold text-white">FDM 3D Print Property Simulator (v5)</h1>
-            <p class="text-lg text-gray-400">Simulate and Optimize Mechanical Properties, Cost, Time, and Accuracy.</p>
+            <h1 class="text-3xl font-bold text-white">FDM 3D Print Property Simulator (v6)</h1>
+            <p class="text-lg text-gray-400">Simulate mechanical properties or optimize settings based on your goals.
+            </p>
         </header>
 
-        <!-- v4: Main App Tabs -->
-        <div class="mb-6">
-            <nav class="flex space-x-4" aria-label="Tabs">
-                <button id="tab-simulator" class="tab-btn active">Simulator</button>
-                <button id="tab-optimizer" class="tab-btn">Optimizer</button>
-            </nav>
-        </div>
-
-        <!-- v3: Global Print Settings Card -->
+        <!-- Global Settings -->
         <div class="simulator-card mb-6">
             <h2 class="text-xl font-semibold text-white mb-4">Global Print Settings</h2>
-            <p class="text-gray-400 text-sm mb-4">These values are used by all models for cost and time estimation.</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="relative group">
-                    <label for="global_part_mass_g" class="block text-sm font-medium text-gray-300 mb-2">Filament Used
-                        (g)</label>
-                    <span
-                        class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                        Enter the total filament weight (in grams) as reported by your slicer.
-                    </span>
-                    <input type="number" id="global_part_mass_g" value="50"
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- v3: Changed to Filament Used (g) -->
+                <div>
+                    <label for="part_mass_g" class="block text-sm font-medium text-gray-300 mb-2 tooltip">
+                        Filament Used (g)
+                        <span class="tooltip-text">Enter the estimated filament weight for your part (in grams) from
+                            your slicer.</span>
+                    </label>
+                    <input type="number" id="part_mass_g" value="50"
                         class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
                 </div>
-                <div class="relative group">
-                    <label for="global_filament_cost_kg" class="block text-sm font-medium text-gray-300 mb-2">Filament
-                        Cost ($/kg)</label>
-                    <span
-                        class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                        Enter the price you paid for a 1kg (1000g) spool of this filament.
-                    </span>
-                    <input type="number" id="global_filament_cost_kg" value="25"
+                <div>
+                    <label for="filament_cost_kg" class="block text-sm font-medium text-gray-300 mb-2 tooltip">
+                        Filament Cost ($/kg)
+                        <span class="tooltip-text">Enter the cost of a 1kg spool of your filament (e.g., 25.00).</span>
+                    </label>
+                    <input type="number" id="filament_cost_kg" value="25.0"
                         class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
                 </div>
             </div>
         </div>
 
-        <!-- ================================== -->
-        <!-- ===== v4: SIMULATOR TAB ======== -->
-        <!-- ================================== -->
-        <div id="content-simulator" class="tab-content active">
-            <!-- Model Selector -->
+        <!-- Main Tabs -->
+        <div class="mb-6 border-b border-gray-700">
+            <nav class="flex">
+                <button class="tab-button active" data-tab="simulator">Simulator</button>
+                <button class="tab-button" data-tab="optimizer">Optimizer</button>
+            </nav>
+        </div>
+
+        <!-- Simulator Tab Content -->
+        <div id="tab-simulator" class="tab-content active">
             <div class="mb-6">
                 <label for="modelSelector" class="block text-sm font-medium text-gray-300 mb-2">Select Simulation
                     Model</label>
                 <select id="modelSelector"
                     class="w-full max-w-md bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="kaggle" selected>Kaggle Model (Strength, Roughness, Elongation)</option>
+                    <option value="warpage">Warp Deformation (Nazan et al.)</option> <!-- v6: New -->
+                    <option value="accuracy">Dimensional Accuracy (Deswal et al.)</option>
+                    <option value="fatigue">Fatigue Lifetime Model (Azadi et al.)</option>
                     <option value="c3">C3 Model (Tensile Strength & Elongation)</option>
-                    <option value="fea">FEA Material Card (Anisotropic Properties)</option>
-                    <option value="fatigue">Fatigue Lifetime Model (Cycles to Failure)</option>
-                    <option value="accuracy">Dimensional Accuracy (v5)</option>
+                    <option value="fea">FEA Material Card (Lee & Tucker)</option>
                 </select>
             </div>
 
-            <!-- Main Content Grid -->
+            <!-- Simulator Grid -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                 <!-- Column 1: G-Code Parser & Parameters -->
@@ -284,102 +296,112 @@
 
                         <!-- Kaggle Model Parameters -->
                         <div id="kaggle-params" class="model-params space-y-4">
-                            <div class="relative group">
+                            <!-- Material Database Selector -->
+                            <div>
                                 <label for="kaggle_material_database"
-                                    class="block text-sm font-medium text-gray-300 mb-2">Material Datasheet</label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Select a material to auto-fill common print settings.
-                                </span>
+                                    class="block text-sm font-medium text-gray-300 mb-2 tooltip">
+                                    Load Material Profile (Kaggle)
+                                    <span class="tooltip-text">Select a material to auto-fill common settings.</span>
+                                </label>
                                 <select id="kaggle_material_database"
                                     class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
                                     <option value="">-- Select Material --</option>
                                     <!-- Options populated by JS -->
                                 </select>
-                                <input type="hidden" id="material" value="pla">
+                                <input type="hidden" id="material" value="pla"> <!-- Hidden field for the model -->
                             </div>
-                            <hr class="border-gray-700" />
-
-                            <div class="relative group">
-                                <label for="layer_height" class="slider-label"><span>Layer Height (mm)</span><span
-                                        id="layer_height_val" class="slider-value">0.1</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Thickness of each individual printed layer. Smaller is higher quality but slower.
-                                </span>
-                                <input type="range" id="layer_height" min="0.02" max="0.3" step="0.01" value="0.1"
-                                    class="w-full">
+                            <!-- Sliders -->
+                            <div>
+                                <label for="layer_height" class="slider-label tooltip">
+                                    <span>Layer Height (mm)</span>
+                                    <span class="tooltip-text">Thickness of each individual printed layer. Smaller is
+                                        higher quality but slower.</span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="layer_height" min="0.02" max="0.3" step="0.01" value="0.1"
+                                        class="w-full">
+                                    <span id="layer_height_val" class="slider-value w-12 text-right">0.1</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="wall_thickness" class="slider-label"><span>Wall Thickness
-                                        (layers)</span><span id="wall_thickness_val"
-                                        class="slider-value">4</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Number of outer shells (perimeters). More walls = stronger part.
-                                </span>
-                                <input type="range" id="wall_thickness" min="1" max="10" step="1" value="4"
-                                    class="w-full">
+                            <div>
+                                <label for="wall_thickness" class="slider-label tooltip">
+                                    <span>Wall Thickness (layers)</span>
+                                    <span class="tooltip-text">Number of outer shells (perimeters). More walls =
+                                        stronger part.</span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="wall_thickness" min="1" max="10" step="1" value="4"
+                                        class="w-full">
+                                    <span id="wall_thickness_val" class="slider-value w-12 text-right">4</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="infill_density" class="slider-label"><span>Infill Density (%)</span><span
-                                        id="infill_density_val" class="slider-value">50</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Percentage of material used for the internal support structure. Higher = stronger
-                                    and heavier.
-                                </span>
-                                <input type="range" id="infill_density" min="10" max="100" step="1" value="50"
-                                    class="w-full">
+                            <div>
+                                <label for="infill_density" class="slider-label tooltip">
+                                    <span>Infill Density (%)</span>
+                                    <span class="tooltip-text">Percentage of material used for the internal support
+                                        structure. Higher = stronger and heavier.</span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="infill_density" min="10" max="100" step="1" value="50"
+                                        class="w-full">
+                                    <span id="infill_density_val" class="slider-value w-12 text-right">50</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="nozzle_temperature" class="slider-label"><span>Nozzle Temp (°C)</span><span
-                                        id="nozzle_temperature_val" class="slider-value">220</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Temperature of the extruder. Critical for layer adhesion and strength.
-                                </span>
-                                <input type="range" id="nozzle_temperature" min="200" max="250" step="1" value="220"
-                                    class="w-full">
+                            <div>
+                                <label for="nozzle_temperature" class="slider-label tooltip">
+                                    <span>Nozzle Temp (°C)</span>
+                                    <span class="tooltip-text">Temperature of the extruder. Critical for layer adhesion
+                                        and strength.</span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="nozzle_temperature" min="200" max="250" step="1" value="220"
+                                        class="w-full">
+                                    <span id="nozzle_temperature_val" class="slider-value w-12 text-right">220</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="bed_temperature" class="slider-label"><span>Bed Temp (°C)</span><span
-                                        id="bed_temperature_val" class="slider-value">60</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Temperature of the print surface. Prevents warping and helps with first-layer
-                                    adhesion.
-                                </span>
-                                <input type="range" id="bed_temperature" min="50" max="100" step="1" value="60"
-                                    class="w-full">
+                            <div>
+                                <label for="bed_temperature" class="slider-label tooltip">
+                                    <span>Bed Temp (°C)</span>
+                                    <span class="tooltip-text">Temperature of the print surface. Prevents warping and
+                                        helps with first-layer adhesion.</span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="bed_temperature" min="50" max="100" step="1" value="60"
+                                        class="w-full">
+                                    <span id="bed_temperature_val" class="slider-value w-12 text-right">60</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="print_speed" class="slider-label"><span>Print Speed (mm/s)</span><span
-                                        id="print_speed_val" class="slider-value">60</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Speed of the print head (mm/s). Slower is generally stronger and more accurate.
-                                </span>
-                                <input type="range" id="print_speed" min="40" max="120" step="1" value="60"
-                                    class="w-full">
+                            <div>
+                                <label for="print_speed" class="slider-label tooltip">
+                                    <span>Print Speed (mm/s)</span>
+                                    <span class="tooltip-text">Speed of the print head (mm/s). Slower is generally
+                                        stronger and more accurate.</span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="print_speed" min="40" max="120" step="1" value="60"
+                                        class="w-full">
+                                    <span id="print_speed_val" class="slider-value w-12 text-right">60</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="fan_speed" class="slider-label"><span>Fan Speed (%)</span><span
-                                        id="fan_speed_val" class="slider-value">50</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Cooling fan speed. Higher speed cools the plastic faster, improving overhangs but
-                                    can reduce layer bonding.
-                                </span>
-                                <input type="range" id="fan_speed" min="0" max="100" step="1" value="50" class="w-full">
+                            <div>
+                                <label for="fan_speed" class="slider-label tooltip">
+                                    <span>Fan Speed (%)</span>
+                                    <span class="tooltip-text">Cooling fan speed. Higher speed cools the plastic faster,
+                                        improving overhangs but can reduce layer bonding.</span>
+                                </label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="fan_speed" min="0" max="100" step="1" value="50"
+                                        class="w-full">
+                                    <span id="fan_speed_val" class="slider-value w-12 text-right">50</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="infill_pattern" class="block text-sm font-medium text-gray-300 mb-2">Infill
-                                    Pattern</label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Geometric shape of the internal infill (e.g., Grid, Honeycomb).
-                                </span>
+                            <div>
+                                <label for="infill_pattern"
+                                    class="block text-sm font-medium text-gray-300 mb-2 tooltip">
+                                    Infill Pattern
+                                    <span class="tooltip-text">Geometric shape of the internal infill (e.g., Grid,
+                                        Honeycomb).</span>
+                                </label>
                                 <select id="infill_pattern"
                                     class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
                                     <option value="grid">Grid</option>
@@ -390,162 +412,164 @@
 
                         <!-- C3 Model Parameters -->
                         <div id="c3-params" class="model-params space-y-4 hidden">
-                            <div class="relative group">
-                                <label for="c3_Temperature" class="slider-label"><span>Nozzle Temp (°C)</span><span
-                                        id="c3_Temperature_val" class="slider-value">205</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Temperature of the extruder. Critical for layer adhesion and strength.
-                                </span>
-                                <input type="range" id="c3_Temperature" min="190" max="220" step="1" value="205"
-                                    class="w-full">
+                            <!-- ... C3 sliders ... -->
+                            <div>
+                                <label for="c3_Temperature" class="slider-label tooltip"><span>Nozzle Temp
+                                        (°C)</span><span class="tooltip-text">Temperature of the extruder. Critical for
+                                        layer adhesion and strength.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="c3_Temperature" min="190" max="220" step="1" value="205"
+                                        class="w-full">
+                                    <span id="c3_Temperature_val" class="slider-value w-12 text-right">205</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="c3_Speed" class="slider-label"><span>Print Speed (mm/s)</span><span
-                                        id="c3_Speed_val" class="slider-value">70</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Speed of the print head (mm/s). Slower is generally stronger.
-                                </span>
-                                <input type="range" id="c3_Speed" min="40" max="100" step="1" value="70" class="w-full">
+                            <div>
+                                <label for="c3_Speed" class="slider-label tooltip"><span>Print Speed (mm/s)</span><span
+                                        class="tooltip-text">Speed of the print head (mm/s). Slower is generally
+                                        stronger.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="c3_Speed" min="40" max="100" step="1" value="70"
+                                        class="w-full">
+                                    <span id="c3_Speed_val" class="slider-value w-12 text-right">70</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="c3_Angle" class="slider-label"><span>Raster Angle (°)</span><span
-                                        id="c3_Angle_val" class="slider-value">45</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Raster angle (e.g., 0°, 45°, 90°). The direction lines are printed relative to the
-                                    part's X/Y axes.
-                                </span>
-                                <input type="range" id="c3_Angle" min="0" max="90" step="15" value="45" class="w-full">
+                            <div>
+                                <label for="c3_Angle" class="slider-label tooltip"><span>Raster Angle (°)</span><span
+                                        class="tooltip-text">Raster angle (e.g., 0°, 45°, 90°). The direction lines are
+                                        printed relative to the part's X/Y axes.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="c3_Angle" min="0" max="90" step="15" value="45"
+                                        class="w-full">
+                                    <span id="c3_Angle_val" class="slider-value w-12 text-right">45</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="c3_Height" class="slider-label"><span>Layer Height (mm)</span><span
-                                        id="c3_Height_val" class="slider-value">0.15</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Thickness of each individual printed layer. Smaller is higher quality but slower.
-                                </span>
-                                <input type="range" id="c3_Height" min="0.1" max="0.2" step="0.01" value="0.15"
-                                    class="w-full">
+                            <div>
+                                <label for="c3_Height" class="slider-label tooltip"><span>Layer Height (mm)</span><span
+                                        class="tooltip-text">Thickness of each individual printed layer. Smaller is
+                                        higher quality but slower.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="c3_Height" min="0.1" max="0.2" step="0.01" value="0.15"
+                                        class="w-full">
+                                    <span id="c3_Height_val" class="slider-value w-12 text-right">0.15</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="c3_Fill" class="slider-label"><span>Infill Density (%)</span><span
-                                        id="c3_Fill_val" class="slider-value">85</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Percentage of material used for the internal support structure. Higher = stronger.
-                                </span>
-                                <input type="range" id="c3_Fill" min="70" max="100" step="1" value="85" class="w-full">
+                            <div>
+                                <label for="c3_Fill" class="slider-label tooltip"><span>Infill Density (%)</span><span
+                                        class="tooltip-text">Percentage of material used for the internal support
+                                        structure. Higher = stronger.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="c3_Fill" min="70" max="100" step="1" value="85"
+                                        class="w-full">
+                                    <span id="c3_Fill_val" class="slider-value w-12 text-right">85</span>
+                                </div>
                             </div>
                         </div>
 
                         <!-- FEA Model Parameters -->
                         <div id="fea-params" class="model-params space-y-4 hidden">
-                            <div class="relative group">
+                            <!-- Material Database Selector -->
+                            <div>
                                 <label for="fea_material_database"
-                                    class="block text-sm font-medium text-gray-300 mb-2">Material Datasheet</label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Select a material to auto-fill its core FEA properties.
-                                </span>
+                                    class="block text-sm font-medium text-gray-300 mb-2 tooltip">
+                                    Load Material Profile (FEA)
+                                    <span class="tooltip-text">Select a material to auto-fill its datasheet properties
+                                        (Young's Modulus, etc.).</span>
+                                </label>
                                 <select id="fea_material_database"
                                     class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
                                     <option value="">-- Select Material --</option>
                                     <!-- Options populated by JS -->
                                 </select>
                             </div>
-                            <hr class="border-gray-700" />
                             <h3 class="text-lg font-semibold text-blue-300">Filament Datasheet Properties</h3>
-                            <div class="relative group">
-                                <label for="fea_Material_Bonding_Perfection" class="slider-label"><span>Bonding
-                                        Perfection</span><span id="fea_Material_Bonding_Perfection_val"
-                                        class="slider-value">0.5</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    A factor (0.1-1.0) representing how well layers bond. 1.0 is a perfect bond (like
-                                    injection molding).
-                                </span>
-                                <input type="range" id="fea_Material_Bonding_Perfection" min="0.1" max="1.0" step="0.01"
-                                    value="0.5" class="w-full">
+                            <div>
+                                <label for="fea_Material_Bonding_Perfection" class="slider-label tooltip"><span>Bonding
+                                        Perfection</span><span class="tooltip-text">A factor (0.1-1.0) representing how
+                                        well layers bond. 1.0 is a perfect bond (like injection molding).</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="fea_Material_Bonding_Perfection" min="0.1" max="1.0"
+                                        step="0.01" value="0.5" class="w-full">
+                                    <span id="fea_Material_Bonding_Perfection_val"
+                                        class="slider-value w-12 text-right">0.5</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="fea_Material_Youngs_Modulus_GPa" class="slider-label"><span>Young's Modulus
-                                        (GPa)</span><span id="fea_Material_Youngs_Modulus_GPa_val"
-                                        class="slider-value">2.5</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Material stiffness. Find this value on your filament's Technical Data Sheet (TDS).
-                                </span>
-                                <input type="range" id="fea_Material_Youngs_Modulus_GPa" min="1.0" max="5.0" step="0.1"
-                                    value="2.5" class="w-full">
+                            <div>
+                                <label for="fea_Material_Youngs_Modulus_GPa" class="slider-label tooltip"><span>Young's
+                                        Modulus (GPa)</span><span class="tooltip-text">Material stiffness. Find this
+                                        value on your filament's Technical Data Sheet (TDS).</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="fea_Material_Youngs_Modulus_GPa" min="1.0" max="5.0"
+                                        step="0.1" value="2.5" class="w-full">
+                                    <span id="fea_Material_Youngs_Modulus_GPa_val"
+                                        class="slider-value w-12 text-right">2.5</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="fea_Material_Tensile_Yield_Strenght_MPa" class="slider-label"><span>Tensile
-                                        Strength (MPa)</span><span id="fea_Material_Tensile_Yield_Strenght_MPa_val"
-                                        class="slider-value">50</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Maximum stress the *raw filament* can take. Find this on your filament's TDS.
-                                </span>
-                                <input type="range" id="fea_Material_Tensile_Yield_Strenght_MPa" min="20" max="80"
-                                    step="1" value="50" class="w-full">
+                            <div>
+                                <label for="fea_Material_Tensile_Yield_Strenght_MPa"
+                                    class="slider-label tooltip"><span>Tensile Strength (MPa)</span><span
+                                        class="tooltip-text">Maximum stress the *raw filament* can take. Find this on
+                                        your filament's TDS.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="fea_Material_Tensile_Yield_Strenght_MPa" min="20" max="80"
+                                        step="1" value="50" class="w-full">
+                                    <span id="fea_Material_Tensile_Yield_Strenght_MPa_val"
+                                        class="slider-value w-12 text-right">50</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="fea_Material_Poissons_Ratio" class="slider-label"><span>Poisson's
-                                        Ratio</span><span id="fea_Material_Poissons_Ratio_val"
-                                        class="slider-value">0.35</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Material's tendency to shrink/expand sideways when stretched/compressed. Find this
-                                    on your filament's TDS.
-                                </span>
-                                <input type="range" id="fea_Material_Poissons_Ratio" min="0.1" max="0.5" step="0.01"
-                                    value="0.35" class="w-full">
+                            <div>
+                                <label for="fea_Material_Poissons_Ratio" class="slider-label tooltip"><span>Poisson's
+                                        Ratio</span><span class="tooltip-text">Material's tendency to shrink/expand
+                                        sideways when stretched/compressed. Find this on your filament's
+                                        TDS.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="fea_Material_Poissons_Ratio" min="0.1" max="0.5" step="0.01"
+                                        value="0.35" class="w-full">
+                                    <span id="fea_Material_Poissons_Ratio_val"
+                                        class="slider-value w-12 text-right">0.35</span>
+                                </div>
                             </div>
 
                             <h3 class="text-lg font-semibold text-blue-300 mt-4">Slicer Settings</h3>
-                            <div class="relative group">
-                                <label for="fea_User_Infill_Density" class="slider-label"><span>Infill
-                                        Density</span><span id="fea_User_Infill_Density_val"
-                                        class="slider-value">0.5</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Infill percentage (as a decimal, 0.1-1.0) for the part you are simulating.
-                                </span>
-                                <input type="range" id="fea_User_Infill_Density" min="0.1" max="1.0" step="0.01"
-                                    value="0.5" class="w-full">
+                            <div>
+                                <label for="fea_User_Infill_Density" class="slider-label tooltip"><span>Infill Density
+                                        (0.1-1.0)</span><span class="tooltip-text">Infill percentage (as a decimal,
+                                        0.1-1.0) for the part you are simulating.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="fea_User_Infill_Density" min="0.1" max="1.0" step="0.01"
+                                        value="0.5" class="w-full">
+                                    <span id="fea_User_Infill_Density_val"
+                                        class="slider-value w-12 text-right">0.5</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="fea_User_Line_Thickenss_mm" class="slider-label"><span>Line Thickness
-                                        (mm)</span><span id="fea_User_Line_Thickenss_mm_val"
-                                        class="slider-value">0.4</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Width of a single extruded line (e.g., 0.4mm for a 0.4mm nozzle).
-                                </span>
-                                <input type="range" id="fea_User_Line_Thickenss_mm" min="0.2" max="0.8" step="0.01"
-                                    value="0.4" class="w-full">
+                            <div>
+                                <label for="fea_User_Line_Thickenss_mm" class="slider-label tooltip"><span>Line
+                                        Thickness (mm)</span><span class="tooltip-text">Width of a single extruded line
+                                        (e.g., 0.4mm for a 0.4mm nozzle).</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="fea_User_Line_Thickenss_mm" min="0.2" max="0.8" step="0.01"
+                                        value="0.4" class="w-full">
+                                    <span id="fea_User_Line_Thickenss_mm_val"
+                                        class="slider-value w-12 text-right">0.4</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="fea_User_Layer_Height_mm" class="slider-label"><span>Layer Height
-                                        (mm)</span><span id="fea_User_Layer_Height_mm_val"
-                                        class="slider-value">0.2</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Thickness of each individual printed layer for the part you are simulating.
-                                </span>
-                                <input type="range" id="fea_User_Layer_Height_mm" min="0.1" max="0.4" step="0.01"
-                                    value="0.2" class="w-full">
+                            <div>
+                                <label for="fea_User_Layer_Height_mm" class="slider-label tooltip"><span>Layer Height
+                                        (mm)</span><span class="tooltip-text">Thickness of each individual printed layer
+                                        for the part you are simulating.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="fea_User_Layer_Height_mm" min="0.1" max="0.4" step="0.01"
+                                        value="0.2" class="w-full">
+                                    <span id="fea_User_Layer_Height_mm_val"
+                                        class="slider-value w-12 text-right">0.2</span>
+                                </div>
                             </div>
-                            <div class="relative group">
+                            <div>
                                 <label for="fea_User_Infill_Pattern"
-                                    class="block text-sm font-medium text-gray-300 mb-2">Infill Pattern</label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Geometric shape of the internal infill. This model supports Rectilinear and
-                                    Concentric.
-                                </span>
+                                    class="block text-sm font-medium text-gray-300 mb-2 tooltip">
+                                    Infill Pattern
+                                    <span class="tooltip-text">Geometric shape of the internal infill. This model
+                                        supports Rectilinear and Concentric.</span>
+                                </label>
                                 <select id="fea_User_Infill_Pattern"
                                     class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
                                     <option value="Rectilinear">Rectilinear</option>
@@ -556,116 +580,162 @@
 
                         <!-- Fatigue Model Parameters -->
                         <div id="fatigue-params" class="model-params space-y-4 hidden">
-                            <div class="relative group">
+                            <!-- Material Database Selector -->
+                            <div>
                                 <label for="fatigue_material_database"
-                                    class="block text-sm font-medium text-gray-300 mb-2">Material Datasheet</label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Select a material to auto-fill its recommended print settings for fatigue.
-                                </span>
+                                    class="block text-sm font-medium text-gray-300 mb-2 tooltip">
+                                    Load Material Profile (Fatigue)
+                                    <span class="tooltip-text">Select a material to auto-fill common settings.</span>
+                                </label>
                                 <select id="fatigue_material_database"
                                     class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
                                     <option value="">-- Select Material --</option>
                                     <!-- Options populated by JS -->
                                 </select>
                             </div>
-                            <hr class="border-gray-700" />
                             <h3 class="text-lg font-semibold text-blue-300">Part Load</h3>
-                            <div class="relative group">
-                                <label for="fatigue_Stress_Level" class="slider-label"><span>Applied Stress Level
-                                        (MPa)</span><span id="fatigue_Stress_Level_val"
-                                        class="slider-value">10</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    The real-world cyclical load (in MegaPascals) you expect the part to endure. This is
-                                    *not* a slicer setting. Estimate this based on your part's use case.
-                                </span>
-                                <input type="range" id="fatigue_Stress_Level" min="2.5" max="15" step="0.1" value="10"
-                                    class="w-full">
+                            <div>
+                                <label for="fatigue_Stress_Level" class="slider-label tooltip"><span>Applied Stress
+                                        Level (MPa)</span><span class="tooltip-text">The real-world cyclical load (in
+                                        MegaPascals) you expect the part to endure. This is *not* a slicer setting.
+                                        Estimate this based on your part's use case.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="fatigue_Stress_Level" min="2.5" max="15" step="0.1"
+                                        value="10" class="w-full">
+                                    <span id="fatigue_Stress_Level_val" class="slider-value w-12 text-right">10.0</span>
+                                </div>
                             </div>
                             <h3 class="text-lg font-semibold text-blue-300 mt-4">Slicer Settings</h3>
-                            <div class="relative group">
-                                <label for="fatigue_Nozzle_Diameter" class="slider-label"><span>Nozzle Diameter
-                                        (mm)</span><span id="fatigue_Nozzle_Diameter_val"
-                                        class="slider-value">0.4</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    The diameter of the nozzle used to print the part (e.g., 0.4mm, 0.6mm).
-                                </span>
-                                <input type="range" id="fatigue_Nozzle_Diameter" min="0.2" max="0.6" step="0.1"
-                                    value="0.4" class="w-full">
+                            <div>
+                                <label for="fatigue_Nozzle_Diameter" class="slider-label tooltip"><span>Nozzle Diameter
+                                        (mm)</span><span class="tooltip-text">The diameter of the nozzle used to print
+                                        the part (e.g., 0.4mm, 0.6mm).</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="fatigue_Nozzle_Diameter" min="0.2" max="0.6" step="0.1"
+                                        value="0.4" class="w-full">
+                                    <span id="fatigue_Nozzle_Diameter_val"
+                                        class="slider-value w-12 text-right">0.4</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="fatigue_Print_Speed" class="slider-label"><span>Print Speed
-                                        (mm/s)</span><span id="fatigue_Print_Speed_val"
-                                        class="slider-value">10</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Speed of the print head (mm/s). Slower is generally stronger and more durable.
-                                </span>
-                                <input type="range" id="fatigue_Print_Speed" min="5" max="15" step="1" value="10"
-                                    class="w-full">
+                            <div>
+                                <label for="fatigue_Print_Speed" class="slider-label tooltip"><span>Print Speed
+                                        (mm/s)</span><span class="tooltip-text">Speed of the print head (mm/s). Slower
+                                        is generally stronger and more durable.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="fatigue_Print_Speed" min="5" max="15" step="1" value="10"
+                                        class="w-full">
+                                    <span id="fatigue_Print_Speed_val" class="slider-value w-12 text-right">10</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="fatigue_Nozzle_Temperature" class="slider-label"><span>Nozzle Temp
-                                        (°C)</span><span id="fatigue_Nozzle_Temperature_val"
-                                        class="slider-value">210</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Temperature of the extruder. Critical for layer adhesion and fatigue life.
-                                </span>
-                                <input type="range" id="fatigue_Nozzle_Temperature" min="180" max="240" step="1"
-                                    value="210" class="w-full">
+                            <div>
+                                <label for="fatigue_Nozzle_Temperature" class="slider-label tooltip"><span>Nozzle Temp
+                                        (°C)</span><span class="tooltip-text">Temperature of the extruder. Critical for
+                                        layer adhesion and fatigue life.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="fatigue_Nozzle_Temperature" min="180" max="240" step="1"
+                                        value="210" class="w-full">
+                                    <span id="fatigue_Nozzle_Temperature_val"
+                                        class="slider-value w-12 text-right">210</span>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- v5: Accuracy Model Parameters -->
+                        <!-- Accuracy Model Parameters -->
                         <div id="accuracy-params" class="model-params space-y-4 hidden">
-                            <div class="relative group">
-                                <label for="acc_Layer_Thickness_mm" class="slider-label"><span>Layer Thickness
-                                        (mm)</span><span id="acc_Layer_Thickness_mm_val"
-                                        class="slider-value">0.2</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Thickness of each individual printed layer.
-                                </span>
-                                <input type="range" id="acc_Layer_Thickness_mm" min="0.1" max="0.4" step="0.01"
-                                    value="0.2" class="w-full">
+                            <div>
+                                <label for="accuracy_Layer_Thickness_mm" class="slider-label tooltip"><span>Layer Height
+                                        (mm)</span><span class="tooltip-text">Thickness of each individual printed
+                                        layer.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="accuracy_Layer_Thickness_mm" min="0.1" max="0.4" step="0.1"
+                                        value="0.2" class="w-full">
+                                    <span id="accuracy_Layer_Thickness_mm_val"
+                                        class="slider-value w-12 text-right">0.2</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="acc_Build_Orientation_deg" class="slider-label"><span>Build Orientation
-                                        (°)</span><span id="acc_Build_Orientation_deg_val"
-                                        class="slider-value">45</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    The angle of the part on the build plate relative to the X-axis (0-90°).
-                                </span>
-                                <input type="range" id="acc_Build_Orientation_deg" min="0" max="90" step="15" value="45"
-                                    class="w-full">
+                            <div>
+                                <label for="accuracy_Build_Orientation_deg" class="slider-label tooltip"><span>Build
+                                        Orientation (°)</span><span class="tooltip-text">Orientation of the part on the
+                                        build plate relative to the X-axis (0-90°).</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="accuracy_Build_Orientation_deg" min="0" max="90" step="15"
+                                        value="45" class="w-full">
+                                    <span id="accuracy_Build_Orientation_deg_val"
+                                        class="slider-value w-12 text-right">45</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="acc_Infill_Density_percent" class="slider-label"><span>Infill Density
-                                        (%)</span><span id="acc_Infill_Density_percent_val"
-                                        class="slider-value">90</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Percentage of material used for the internal support structure.
-                                </span>
-                                <input type="range" id="acc_Infill_Density_percent" min="80" max="100" step="1"
-                                    value="90" class="w-full">
+                            <div>
+                                <label for="accuracy_Infill_Density_percent" class="slider-label tooltip"><span>Infill
+                                        Density (%)</span><span class="tooltip-text">Percentage of material used for the
+                                        internal support structure.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="accuracy_Infill_Density_percent" min="80" max="100" step="5"
+                                        value="90" class="w-full">
+                                    <span id="accuracy_Infill_Density_percent_val"
+                                        class="slider-value w-12 text-right">90</span>
+                                </div>
                             </div>
-                            <div class="relative group">
-                                <label for="acc_Number_of_Contours" class="slider-label"><span>Number of
-                                        Contours</span><span id="acc_Number_of_Contours_val"
-                                        class="slider-value">2</span></label>
-                                <span
-                                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    Number of outer shells/walls (perimeters).
-                                </span>
-                                <input type="range" id="acc_Number_of_Contours" min="1" max="3" step="1" value="2"
-                                    class="w-full">
+                            <div>
+                                <label for="accuracy_Number_of_Contours" class="slider-label tooltip"><span>Number of
+                                        Contours</span><span class="tooltip-text">Number of outer shells
+                                        (perimeters/walls).</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="accuracy_Number_of_Contours" min="1" max="3" step="1"
+                                        value="1" class="w-full">
+                                    <span id="accuracy_Number_of_Contours_val"
+                                        class="slider-value w-12 text-right">1</span>
+                                </div>
                             </div>
                         </div>
+
+                        <!-- v6: Warpage Model Parameters -->
+                        <div id="warpage-params" class="model-params space-y-4 hidden">
+                            <div>
+                                <label for="warpage_Layer_Temperature_C" class="slider-label tooltip"><span>Nozzle Temp
+                                        (°C)</span><span class="tooltip-text">Temperature of the extruder. Higher
+                                        temperatures can increase warping.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="warpage_Layer_Temperature_C" min="190" max="210" step="1"
+                                        value="200" class="w-full">
+                                    <span id="warpage_Layer_Temperature_C_val"
+                                        class="slider-value w-12 text-right">200</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="warpage_Infill_Density_percent" class="slider-label tooltip"><span>Infill
+                                        Density (%)</span><span class="tooltip-text">Higher infill density creates more
+                                        internal stress, increasing warping.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="warpage_Infill_Density_percent" min="10" max="30" step="1"
+                                        value="20" class="w-full">
+                                    <span id="warpage_Infill_Density_percent_val"
+                                        class="slider-value w-12 text-right">20</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="warpage_First_Layer_Height_mm" class="slider-label tooltip"><span>First
+                                        Layer Height (mm)</span><span class="tooltip-text">A thicker, more 'squished'
+                                        first layer can help reduce corner lift.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="warpage_First_Layer_Height_mm" min="0.2" max="0.4"
+                                        step="0.01" value="0.3" class="w-full">
+                                    <span id="warpage_First_Layer_Height_mm_val"
+                                        class="slider-value w-12 text-right">0.3</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="warpage_Other_Layer_Height_mm" class="slider-label tooltip"><span>Layer
+                                        Height (mm)</span><span class="tooltip-text">Thickness of all subsequent
+                                        layers.</span></label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="range" id="warpage_Other_Layer_Height_mm" min="0.3" max="0.5"
+                                        step="0.01" value="0.4" class="w-full">
+                                    <span id="warpage_Other_Layer_Height_mm_val"
+                                        class="slider-value w-12 text-right">0.4</span>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 
@@ -692,16 +762,16 @@
                             <p id="error-text" class="text-sm">Error details here.</p>
                         </div>
 
-                        <!-- v3: Global Outputs (Cost & Time) -->
-                        <div class="space-y-3 mb-4 p-4 bg-gray-800 rounded-lg">
-                            <div class="output-card bg-gray-700">
+                        <!-- v3: Cost/Time Outputs (Common to all) -->
+                        <div class="model-outputs space-y-3 mb-4">
+                            <div class="output-card bg-gray-800 border border-gray-700">
                                 <div>
                                     <div class="output-label">Estimated Cost</div>
                                     <div id="estimated_cost_usd" class="output-value text-green-400">...</div>
                                 </div>
                                 <div class="text-lg font-medium text-gray-400">USD</div>
                             </div>
-                            <div class="output-card bg-gray-700">
+                            <div class="output-card bg-gray-800 border border-gray-700">
                                 <div>
                                     <div class="output-label">Estimated Print Time</div>
                                     <div id="estimated_print_time_min" class="output-value text-yellow-400">...</div>
@@ -709,7 +779,6 @@
                                 <div class="text-lg font-medium text-gray-400">min</div>
                             </div>
                         </div>
-                        <hr class="border-gray-700 mb-4" />
 
                         <!-- Kaggle Model Outputs -->
                         <div id="kaggle-outputs" class="model-outputs space-y-3">
@@ -805,28 +874,43 @@
                             </div>
                         </div>
 
-                        <!-- v5: Accuracy Model Outputs -->
+                        <!-- Accuracy Model Outputs -->
                         <div id="accuracy-outputs" class="model-outputs space-y-3 hidden">
                             <div class="output-card">
                                 <div>
-                                    <div class="output-label">% Variation in Length</div>
-                                    <div id="acc_Var_Length_percent" class="output-value">...</div>
+                                    <div class="output-label">Length Error</div>
+                                    <div id="Var_Length_percent" class="output-value">...</div>
                                 </div>
                                 <div class="text-lg font-medium text-gray-400">%</div>
                             </div>
                             <div class="output-card">
                                 <div>
-                                    <div class="output-label">% Variation in Width</div>
-                                    <div id="acc_Var_Width_percent" class="output-value">...</div>
+                                    <div class="output-label">Width Error</div>
+                                    <div id="Var_Width_percent" class="output-value">...</div>
                                 </div>
                                 <div class="text-lg font-medium text-gray-400">%</div>
                             </div>
                             <div class="output-card">
                                 <div>
-                                    <div class="output-label">% Variation in Thickness</div>
-                                    <div id="acc_Var_Thickness_percent" class="output-value">...</div>
+                                    <div class="output-label">Thickness Error</div>
+                                    <div id="Var_Thickness_percent" class="output-value">...</div>
                                 </div>
                                 <div class="text-lg font-medium text-gray-400">%</div>
+                            </div>
+                        </div>
+
+                        <!-- v6: Warpage Model Outputs -->
+                        <div id="warpage-outputs" class="model-outputs space-y-3 hidden">
+                            <div class="output-card">
+                                <div>
+                                    <div class="output-label">Predicted Warpage</div>
+                                    <div id="Warpage_mm" class="output-value">...</div>
+                                </div>
+                                <div class="text-lg font-medium text-gray-400">mm</div>
+                            </div>
+                            <div class="text-gray-400 text-sm p-2">
+                                This is an estimate of the maximum corner lift (in mm) due to thermal stress. Lower is
+                                better.
                             </div>
                         </div>
                     </div>
@@ -911,7 +995,7 @@
                             </div>
                         </div>
 
-                        <!-- v5: Accuracy Recommendations -->
+                        <!-- Accuracy Recommendations -->
                         <div id="accuracy-recs" class="model-recs space-y-4 hidden">
                             <div>
                                 <h3 class="text-lg font-semibold text-green-400">To Maximize Dimensional Accuracy
@@ -921,132 +1005,125 @@
                                     <!-- JS will populate this -->
                                 </ul>
                             </div>
+                        </div>
+
+                        <!-- v6: Warpage Recommendations -->
+                        <div id="warpage-recs" class="model-recs space-y-4 hidden">
                             <div>
-                                <h3 class="text-lg font-semibold text-red-400">Settings that Increase Error (Warning):
-                                </h3>
-                                <ul id="accuracy-rec-warning"
-                                    class="list-disc list-inside text-gray-300 text-sm space-y-1">
+                                <h3 class="text-lg font-semibold text-green-400">To Minimize Warpage (Corner Lift):</h3>
+                                <ul id="warpage-rec-life" class="list-disc list-inside text-gray-300 text-sm space-y-1">
                                     <!-- JS will populate this -->
                                 </ul>
                             </div>
                         </div>
+
                     </div>
                 </div>
 
-            </div>
-        </div>
+            </div> <!-- End Simulator Grid -->
+        </div> <!-- End Simulator Tab -->
 
-        <!-- ================================== -->
-        <!-- ===== v4: OPTIMIZER TAB ======== -->
-        <!-- ================================== -->
-        <div id="content-optimizer" class="tab-content">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Column 1: Optimization Setup -->
-                <div class="simulator-card space-y-6">
-                    <div>
-                        <h2 class="text-xl font-semibold text-white mb-4">Optimization Setup</h2>
-                        <p class="text-gray-400 text-sm mb-4">Define your goals, and the genetic algorithm will find the
-                            best parameters to match them.</p>
-                    </div>
+        <!-- Optimizer Tab Content -->
+        <div id="tab-optimizer" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Column 1: Optimizer Setup -->
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="simulator-card">
+                        <h2 class="text-xl font-semibold text-white mb-4">Optimization Goals</h2>
+                        <p class="text-gray-400 text-sm mb-4">
+                            Select a model and define your goals. The optimizer will find the top 5 settings that best
+                            match your objectives.
+                        </p>
 
-                    <!-- Step 1: Select Model -->
-                    <div>
-                        <label for="optModelSelector" class="block text-sm font-medium text-gray-300 mb-2">1. Select
-                            Model to Optimize</label>
-                        <select id="optModelSelector"
-                            class="w-full max-w-md bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="kaggle" selected>Kaggle Model (Strength, Roughness, Elongation)</option>
-                            <option value="accuracy">Dimensional Accuracy (v5)</option>
-                            <option value="c3" disabled>C3 Model (Optimizer not yet supported)</option>
-                            <option value="fea" disabled>FEA Model (Optimizer not yet supported)</option>
-                            <option value="fatigue" disabled>Fatigue Model (Optimizer not yet supported)</option>
-                        </select>
-                    </div>
-
-                    <!-- Step 2: Define Objectives -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">2. Define Objectives (What to
-                            Max/Min)</label>
-                        <div id="optObjectivesContainer" class="space-y-3">
-                            <!-- JS will populate this based on model selection -->
+                        <div>
+                            <label for="optimizerModelSelector" class="block text-sm font-medium text-gray-300 mb-2">1.
+                                Select Model to Optimize</label>
+                            <select id="optimizerModelSelector"
+                                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
+                                <option value="kaggle">Kaggle Model (Strength, Roughness)</option>
+                                <option value="warpage">Warp Deformation (Nazan et al.)</option> <!-- v6: New -->
+                                <option value="accuracy">Dimensional Accuracy (Deswal et al.)</option>
+                                <!-- Add other models (C3, Fatigue) here when their opt params are defined -->
+                            </select>
                         </div>
-                        <button id="addObjectiveBtn" class="mt-3 text-sm text-blue-400 hover:text-blue-300">+ Add
-                            Objective</button>
-                    </div>
 
-                    <!-- Step 3: Define Constraints -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">3. Define Constraints
-                            (Optional)</label>
-                        <div id="optConstraintsContainer" class="space-y-3">
-                            <!-- JS will populate this -->
+                        <div id="optimizer-objectives-container" class="space-y-4 mt-4">
+                            <label class="block text-sm font-medium text-gray-300">2. Define Objectives (What to
+                                Max/Min)</label>
+                            <!-- Objectives will be dynamically added here by JS -->
                         </div>
-                        <button id="addConstraintBtn" class="mt-3 text-sm text-blue-400 hover:text-blue-300">+ Add
-                            Constraint</button>
-                    </div>
 
-                    <button id="runOptimizationBtn"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-lg flex items-center justify-center">
-                        <svg id="optSpinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
-                            </circle>
-                            <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                            </path>
-                        </svg>
-                        <span id="optBtnText">Run Optimization</span>
-                    </button>
-                    <div id="optErrorMsg"
-                        class="hidden text-center text-red-400 p-3 bg-red-900 bg-opacity-30 rounded-lg">
-                        <p id="optErrorText" class="text-sm">Error details here.</p>
+                        <button id="runOptimizer"
+                            class="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">
+                            Run Optimization
+                        </button>
                     </div>
                 </div>
 
-                <!-- Column 2: Optimization Results -->
-                <div class="simulator-card">
-                    <h2 class="text-xl font-semibold text-white mb-4">Optimization Results</h2>
-                    <p class="text-gray-400 text-sm mb-4">Showing the Top 5 "best trade-off" solutions (Pareto front)
-                        found by the algorithm, sorted by your first objective.</p>
+                <!-- Column 2-3: Optimizer Results -->
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="simulator-card">
+                        <h2 class="text-xl font-semibold text-white mb-4">Optimization Results</h2>
 
-                    <div id="optResultsContainer" class="hidden">
-                        <div class="fea-table-container">
-                            <table class="w-full text-left text-sm text-gray-300">
-                                <thead id="optResultsHeader" class="text-xs text-gray-100 uppercase">
-                                    <!-- JS will populate this -->
-                                    THead>
-                                <tbody id="optResultsBody">
-                                    <!-- JS will populate this -->
+                        <!-- Optimizer Spinner -->
+                        <div id="optimizer-spinner" class="hidden text-center text-gray-400 p-8">
+                            <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg"
+                                fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            <p class="mt-4 text-lg">Running Genetic Algorithm...</p>
+                            <p class="text-sm">This may take 30-60 seconds as we simulate thousands of possibilities.
+                            </p>
+                        </div>
+
+                        <!-- Optimizer Error -->
+                        <div id="optimizer-error-message"
+                            class="hidden text-center text-red-400 p-3 bg-red-900 bg-opacity-30 rounded-lg">
+                            <p class="font-bold">Optimization Failed</p>
+                            <p id="optimizer-error-text" class="text-sm">Error details here.</p>
+                        </div>
+
+                        <!-- Optimizer Results Table -->
+                        <div id="optimizer-results-container" class="hidden overflow-x-auto">
+                            <p class="text-gray-300 text-sm mb-4">
+                                Here are the Top 5 "Pareto Front" solutions. These represent the best possible
+                                trade-offs for your selected goals.
+                            </p>
+                            <table class="w-full min-w-max optimizer-table">
+                                <thead id="optimizer-results-head">
+                                    <!-- Header populated by JS -->
+                                </thead>
+                                <tbody id="optimizer-results-body">
+                                    <!-- Body populated by JS -->
                                 </tbody>
                             </table>
                         </div>
                     </div>
-
-                    <div id="optPlaceholder" class="text-center text-gray-500 py-10">
-                        <p>Run the optimizer to see results here.</p>
-                    </div>
                 </div>
             </div>
-        </div>
+        </div> <!-- End Optimizer Tab -->
 
-        <!-- v3: Footer with References -->
-        <footer class="mt-12 text-gray-500 text-sm">
-            <div class="simulator-card bg-gray-900 bg-opacity-30 border-gray-800">
-                <h3 class="text-lg font-semibold text-gray-400 mb-3">Data Sources & References</h3>
-                <p class="mb-3">This application is a predictive tool based on machine learning models trained on
-                    publicly available research data. The models predict properties based on the specific datasets and
-                    experimental conditions from the following papers:</p>
+        <!-- v3: References Footer -->
+        <footer class="mt-12 simulator-card">
+            <h2 class="text-xl font-semibold text-white mb-4">Data Sources & References</h2>
+            <div class="text-gray-400 text-sm space-y-3">
+                <p>This tool is an educational and research demonstrator. The predictive models are based on datasets
+                    and methodologies from the following peer-reviewed articles:</p>
                 <ol class="list-decimal list-inside space-y-2">
                     <li>
-                        <strong>Kaggle Model:</strong> Based on the "3D Printer" dataset by Afumento on Kaggle. Provides
-                        a general-purpose model for PLA/ABS predicting strength, roughness, and elongation.
+                        <strong>Kaggle Model:</strong> Based on the "3D Printer" dataset by Afumento on Kaggle.
+                        Parameters and outputs are derived from this dataset of experimental prints.
                     </li>
                     <li>
-                        <strong>C3 Model:</strong> Based on the stress-strain data from Wang et al. (2024), "Machine
-                        learning enabled 3D printing parameter settings for desired mechanical properties."
+                        <strong>C3 Model:</strong> Based on the dataset from Wang et al. (2024), "Machine learning
+                        enabled 3D printing parameter settings for desired mechanical properties."
                     </li>
                     <li>
-                        <strong>FEA Material Card:</strong> Based on the anisotropic property dataset from Lee & Tucker
+                        <strong>FEA Material Card:</strong> Based on the dataset and methodology from Lee & Tucker
                         (2025), "Data-Driven 3D-Printed Material Data Prediction From Benchmark Specimens."
                     </li>
                     <li>
@@ -1060,9 +1137,14 @@
                         enhancing dimensional preciseness."
                     </li>
                     <li>
-                        <strong>Optimization Methodology:</strong> The genetic algorithm (NSGA-II) is inspired by
-                        optimization research, such as Panico et al. (2025), "Multi objective optimization of FDM 3D
-                        printing parameters..."
+                        <strong>Warp Deformation Model:</strong> Based on the dataset from Nazan et al. (2017), "Process
+                        parameter optimization of 3D printer using response surface method." (v6: New)
+                    </li>
+                    <li>
+                        <strong>Optimization Methodology:</strong> The multi-objective genetic algorithm (NSGA-II) is a
+                        method widely used in FDM optimization research, such as in Panico et al. (2025), "Multi
+                        objective optimization of FDM 3D printing parameters set via design of experiments and machine
+                        learning algorithms."
                     </li>
                 </ol>
             </div>
@@ -1076,7 +1158,7 @@
 
         function init3DViewer() {
             const canvas = document.getElementById('stlCanvas');
-            if (!canvas) return; // Don't init if canvas not on page
+            if (!canvas) return;
 
             // 1. Scene
             scene = new THREE.Scene();
@@ -1121,7 +1203,6 @@
                 if (canvas.offsetParent === null) return; // Only resize if visible
                 const width = canvas.clientWidth;
                 const height = canvas.clientHeight;
-                if (width === 0 || height === 0) return;
                 camera.aspect = width / height;
                 camera.updateProjectionMatrix();
                 renderer.setSize(width, height);
@@ -1181,39 +1262,34 @@
         // --- Global State ---
         let materialsDatabase = {}; // To store materials.json
 
-        // --- Input Getters ---
+        // --- Helper: Get Global Inputs ---
         function getGlobalInputs() {
-            const mass = parseFloat(document.getElementById('global_part_mass_g').value);
-            const cost = parseFloat(document.getElementById('global_filament_cost_kg').value);
-
-            if (isNaN(mass) || mass <= 0) {
-                throw new Error("Filament Used (g) must be a positive number.");
-            }
-            if (isNaN(cost) || cost <= 0) {
-                throw new Error("Filament Cost ($/kg) must be a positive number.");
-            }
-
-            // Get material name from the *active* model's dropdown
-            const selectedModel = document.getElementById('modelSelector').value;
-            let material_name = "PLA"; // Default
-
-            if (selectedModel === 'kaggle') {
-                material_name = document.getElementById('kaggle_material_database').value || document.getElementById('material').value;
-            } else if (selectedModel === 'fea') {
-                material_name = document.getElementById('fea_material_database').value || "PLA";
-            } else if (selectedModel === 'fatigue') {
-                material_name = document.getElementById('fatigue_material_database').value || "PLA";
-            } else {
-                material_name = "PLA"; // C3 and Accuracy models are PLA-based
-            }
-
+            const selectedMaterialName = getSelectedMaterialName();
             return {
-                part_mass_g: mass,
-                filament_cost_kg: cost,
-                material_name: material_name
+                part_mass_g: parseFloat(document.getElementById('part_mass_g').value) || 50.0,
+                filament_cost_kg: parseFloat(document.getElementById('filament_cost_kg').value) || 25.0,
+                material_name: selectedMaterialName
             };
         }
 
+        function getSelectedMaterialName() {
+            const model = modelSelector.value;
+            let selectorId = "kaggle_material_database"; // default
+            if (model === 'fea') selectorId = "fea_material_database";
+            if (model === 'fatigue') selectorId = "fatigue_material_database";
+            // C3, Accuracy, Warpage models don't have a material DB, so we derive it
+            if (model === 'c3' || model === 'accuracy' || model === 'warpage') return "PLA"; // These datasets were PLA
+
+            const selector = document.getElementById(selectorId);
+            if (selector.value) return selector.value;
+
+            // Fallback for Kaggle if no DB entry is selected
+            if (model === 'kaggle') return document.getElementById('material').value;
+
+            return "PLA"; // Generic fallback
+        }
+
+        // --- Input Getters ---
         function getKaggleInputs() {
             return {
                 ...getGlobalInputs(),
@@ -1264,37 +1340,47 @@
             };
         }
 
-        function getAccuracyInputs() { // v5: New Function
+        function getAccuracyInputs() {
             return {
                 ...getGlobalInputs(),
-                Layer_Thickness_mm: parseFloat(document.getElementById('acc_Layer_Thickness_mm').value),
-                Build_Orientation_deg: parseInt(document.getElementById('acc_Build_Orientation_deg').value),
-                Infill_Density_percent: parseInt(document.getElementById('acc_Infill_Density_percent').value),
-                Number_of_Contours: parseInt(document.getElementById('acc_Number_of_Contours').value),
+                Layer_Thickness_mm: parseFloat(document.getElementById('accuracy_Layer_Thickness_mm').value),
+                Build_Orientation_deg: parseInt(document.getElementById('accuracy_Build_Orientation_deg').value),
+                Infill_Density_percent: parseInt(document.getElementById('accuracy_Infill_Density_percent').value),
+                Number_of_Contours: parseInt(document.getElementById('accuracy_Number_of_Contours').value),
+            };
+        }
+
+        function getWarpageInputs() { // v6: New
+            return {
+                ...getGlobalInputs(),
+                Layer_Temperature_C: parseInt(document.getElementById('warpage_Layer_Temperature_C').value),
+                Infill_Density_percent: parseInt(document.getElementById('warpage_Infill_Density_percent').value),
+                First_Layer_Height_mm: parseFloat(document.getElementById('warpage_First_Layer_Height_mm').value),
+                Other_Layer_Height_mm: parseFloat(document.getElementById('warpage_Other_Layer_Height_mm').value),
             };
         }
 
         // --- UI Updaters ---
-        function updateGlobalOutputs(data) {
+        function updateGlobalUI(data) {
             document.getElementById('estimated_cost_usd').textContent = data.estimated_cost_usd.toFixed(2);
             document.getElementById('estimated_print_time_min').textContent = data.estimated_print_time_min.toFixed(1);
         }
 
         function updateKaggleUI(data) {
-            updateGlobalOutputs(data);
+            updateGlobalUI(data);
             document.getElementById('tensile_strength').textContent = data.tensile_strength.toFixed(2);
             document.getElementById('roughness').textContent = data.roughness.toFixed(2);
             document.getElementById('elongation').textContent = data.elongation.toFixed(2);
         }
 
         function updateC3UI(data) {
-            updateGlobalOutputs(data);
+            updateGlobalUI(data);
             document.getElementById('c3_tensile_strength').textContent = data.Tensile_Strength_MPa.toFixed(2);
             document.getElementById('c3_elongation').textContent = data.Elongation_at_Break_percent.toFixed(2);
         }
 
         function updateFEAUI(data) {
-            updateGlobalOutputs(data);
+            updateGlobalUI(data);
             const tableBody = document.getElementById('fea-results-table');
             tableBody.innerHTML = ''; // Clear old results
             for (const [key, value] of Object.entries(data.properties)) {
@@ -1309,35 +1395,50 @@
         }
 
         function updateFatigueUI(data) {
-            updateGlobalOutputs(data);
+            updateGlobalUI(data);
             document.getElementById('fatigue_lifetime').textContent = Math.round(data.Fatigue_Lifetime).toLocaleString();
         }
 
-        function updateAccuracyUI(data) { // v5: New Function
-            updateGlobalOutputs(data);
-            document.getElementById('acc_Var_Length_percent').textContent = data.Var_Length_percent.toFixed(3);
-            document.getElementById('acc_Var_Width_percent').textContent = data.Var_Width_percent.toFixed(3);
-            document.getElementById('acc_Var_Thickness_percent').textContent = data.Var_Thickness_percent.toFixed(3);
+        function updateAccuracyUI(data) {
+            updateGlobalUI(data);
+            document.getElementById('Var_Length_percent').textContent = data.Var_Length_percent.toFixed(3);
+            document.getElementById('Var_Width_percent').textContent = data.Var_Width_percent.toFixed(3);
+            document.getElementById('Var_Thickness_percent').textContent = data.Var_Thickness_percent.toFixed(3);
+        }
+
+        function updateWarpageUI(data) { // v6: New
+            updateGlobalUI(data);
+            document.getElementById('Warpage_mm').textContent = data.Warpage_mm.toFixed(3);
         }
 
         // --- Recommendation Engines ---
         function updateKaggleRecs(inputs) {
             const recQuality = [];
             const recSpeed = [];
+
+            // Quality
             if (inputs.layer_height <= 0.1) recQuality.push("Low layer height is good for quality.");
             else recQuality.push("Consider lowering layer height (< 0.1mm) for better finish and strength.");
+
             if (inputs.infill_density > 80) recQuality.push("High infill density is great for strength.");
             else recQuality.push("Increase infill density (> 80%) for maximum strength.");
+
             if (inputs.print_speed < 60) recQuality.push("Low print speed improves layer adhesion.");
             else recQuality.push("Reduce print speed (< 60mm/s) to increase strength.");
+
             if (inputs.material === 'abs' && inputs.nozzle_temperature < 230) recQuality.push("Increase ABS temp (> 230°C) for better layer bonding.");
             if (inputs.material === 'pla' && inputs.nozzle_temperature < 210) recQuality.push("Increase PLA temp (> 210°C) for better layer bonding.");
+
+            // Speed
             if (inputs.layer_height > 0.2) recSpeed.push("High layer height is great for speed.");
             else recSpeed.push("Increase layer height (> 0.2mm) to reduce print time.");
+
             if (inputs.infill_density < 30) recSpeed.push("Low infill density saves time and material.");
             else recSpeed.push("Lower infill density (< 30%) for faster, cheaper prints (if strength is not critical).");
+
             if (inputs.print_speed > 90) recSpeed.push("High print speed is fast.");
             else recSpeed.push("Increase print speed (> 90mm/s) to reduce print time.");
+
             document.getElementById('kaggle-rec-quality').innerHTML = recQuality.map(rec => `<li>${rec}</li>`).join('');
             document.getElementById('kaggle-rec-speed').innerHTML = recSpeed.map(rec => `<li>${rec}</li>`).join('');
         }
@@ -1345,16 +1446,22 @@
         function updateC3Recs(inputs) {
             const recStrength = [];
             const recElongation = [];
+
             if (inputs.Temperature > 210) recStrength.push("High nozzle temp (> 210°C) is good for strength.");
             else recStrength.push("Increase nozzle temp (> 210°C) for better layer bonding.");
+
             if (inputs.Fill > 90) recStrength.push("High infill density (> 90%) maximizes strength.");
             else recStrength.push("Increase infill density for higher strength.");
+
             if (inputs.Height <= 0.1) recStrength.push("Low layer height (0.1mm) improves strength.");
             else recStrength.push("Decrease layer height to 0.1mm for better strength.");
+
             if (inputs.Temperature < 200) recElongation.push("Lower temps (< 200°C) can increase ductility.");
             else recElongation.push("Try a moderate temperature (~200-210°C).");
+
             if (inputs.Angle === 45) recElongation.push("A 45° raster angle provides a good balance of properties.");
             else recElongation.push("Consider a 45° raster angle for balanced ductility.");
+
             document.getElementById('c3-rec-strength').innerHTML = recStrength.map(rec => `<li>${rec}</li>`).join('');
             document.getElementById('c3-rec-elongation').innerHTML = recElongation.map(rec => `<li>${rec}</li>`).join('');
         }
@@ -1362,33 +1469,52 @@
         function updateFatigueRecs(inputs) {
             const recLife = [];
             const recWarning = [];
+
             if (inputs.Nozzle_Temperature > 220) recLife.push("High nozzle temp (> 220°C) improves layer bonding, increasing fatigue life.");
             else recLife.push("Increase nozzle temp (> 220°C) for significantly better durability.");
+
             if (inputs.Print_Speed < 8) recLife.push("Low print speed (< 8 mm/s) allows better layer fusion.");
             else recLife.push("Reduce print speed (< 8 mm/s) to maximize fatigue life.");
+
             if (inputs.Nozzle_Diameter > 0.4) recLife.push("A larger nozzle diameter (0.6mm) can create stronger bonds.");
             else recLife.push("Consider a larger nozzle (0.6mm) if durability is critical.");
+
             if (inputs.Stress_Level > 10) recWarning.push("High stress levels drastically reduce part lifetime.");
             else recWarning.push("Lowering the applied stress is the most effective way to increase life.");
+
             if (inputs.Nozzle_Temperature < 200) recWarning.push("Low nozzle temp (< 200°C) creates weak bonds that fail quickly under fatigue.");
             if (inputs.Print_Speed > 12) recWarning.push("High print speed (> 12 mm/s) can lead to poor layer adhesion.");
+
             document.getElementById('fatigue-rec-life').innerHTML = recLife.map(rec => `<li>${rec}</li>`).join('');
             document.getElementById('fatigue-rec-warning').innerHTML = recWarning.map(rec => `<li>${rec}</li>`).join('');
         }
 
-        function updateAccuracyRecs(inputs) { // v5: New Function
-            const recLife = [];
-            const recWarning = [];
-            if (inputs.Layer_Thickness_mm <= 0.1) recLife.push("Low layer thickness (0.1mm) minimizes error.");
-            else recLife.push("Lower layer thickness for better accuracy.");
-            if (inputs.Build_Orientation_deg === 45) recLife.push("A 45° orientation often provides the best balance of accuracy.");
-            else recLife.push("Consider a 45° orientation. 0° and 90° can have higher error in some axes.");
-            if (inputs.Number_of_Contours > 1) recLife.push("Multiple contours can help stabilize the part's outer dimensions.");
-            else recLife.push("Use at least 2 contours for better accuracy.");
-            if (inputs.Infill_Density_percent < 100) recWarning.push("Lower infill density (<100%) can lead to more shrinkage and error.");
-            else recWarning.push("100% infill provides the most dimensionally stable (but costly) part.");
-            document.getElementById('accuracy-rec-life').innerHTML = recLife.map(rec => `<li>${rec}</li>`).join('');
-            document.getElementById('accuracy-rec-warning').innerHTML = recWarning.map(rec => `<li>${rec}</li>`).join('');
+        function updateAccuracyRecs(inputs) {
+            const recs = [];
+            if (inputs.Layer_Thickness_mm < 0.2) recs.push("Low layer height (0.1mm) provides the best accuracy.");
+            else recs.push("Reduce layer height (to 0.1mm) for best accuracy.");
+
+            if (inputs.Build_Orientation_deg === 0) recs.push("A 0° orientation (aligned with X-axis) is optimal for accuracy.");
+            else recs.push("Set Build Orientation to 0° for lowest dimensional error.");
+
+            if (inputs.Infill_Density_percent > 95) recs.push("High infill (100%) is best for accuracy.");
+            else recs.push("Increase infill density to 100% to minimize dimensional errors.");
+
+            document.getElementById('accuracy-rec-life').innerHTML = recs.map(rec => `<li>${rec}</li>`).join('');
+        }
+
+        function updateWarpageRecs(inputs) { // v6: New
+            const recs = [];
+            if (inputs.Layer_Temperature_C < 195) recs.push("Low nozzle temp (< 195°C) is ideal for minimizing warpage.");
+            else recs.push("Reduce nozzle temp (to 190-195°C) to reduce thermal stress.");
+
+            if (inputs.Infill_Density_percent < 15) recs.push("Low infill density (< 15%) reduces internal stress and warpage.");
+            else recs.push("Reduce infill density (< 15%) to minimize warpage.");
+
+            if (inputs.First_Layer_Height_mm < 0.3) recs.push("A thinner first layer (0.2mm) can help reduce warpage.");
+            else recs.push("Consider a thinner first layer (0.2mm) for better adhesion and less lift.");
+
+            document.getElementById('warpage-rec-life').innerHTML = recs.map(rec => `<li>${rec}</li>`).join('');
         }
 
         // --- State Management ---
@@ -1422,16 +1548,9 @@
             };
         }
 
-        const simulationRunner = async (modelName, getter, updater, recUpdater) => {
+        // Generic simulation runner
+        async function runSimulation(modelName, inputs, successCallback, recCallback) {
             showSpinner();
-            let inputs;
-            try {
-                inputs = getter();
-            } catch (error) {
-                showError(error.message);
-                return;
-            }
-
             try {
                 const response = await fetch(`${API_BASE_URL}/predict/${modelName}`, {
                     method: 'POST',
@@ -1447,21 +1566,32 @@
                 const data = await response.json();
                 hideSpinner();
                 hideError();
-                updater(data);
-                recUpdater(inputs);
+                successCallback(data);
+                if (recCallback) recCallback(inputs);
 
             } catch (error) {
-                console.error(`Simulation failed for ${modelName}:`, error);
+                console.error("Simulation failed:", error);
                 showError(`Error: ${error.message}. Is the server running?`);
             }
-        };
+        }
 
         // Debounced simulation runners
-        const debouncedKaggleSim = debounce(() => simulationRunner('kaggle', getKaggleInputs, updateKaggleUI, updateKaggleRecs), 300);
-        const debouncedC3Sim = debounce(() => simulationRunner('c3', getC3Inputs, updateC3UI, updateC3Recs), 300);
-        const debouncedFEASim = debounce(() => simulationRunner('fea', getFEAInputs, updateFEAUI, () => { }), 300);
-        const debouncedFatigueSim = debounce(() => simulationRunner('fatigue', getFatigueInputs, updateFatigueUI, updateFatigueRecs), 300);
-        const debouncedAccuracySim = debounce(() => simulationRunner('accuracy', getAccuracyInputs, updateAccuracyUI, updateAccuracyRecs), 300); // v5: New runner
+        const debouncedKaggleSim = debounce(() => runSimulation('kaggle', getKaggleInputs(), updateKaggleUI, updateKaggleRecs), 300);
+        const debouncedC3Sim = debounce(() => runSimulation('c3', getC3Inputs(), updateC3UI, updateC3Recs), 300);
+        const debouncedFEASim = debounce(() => runSimulation('fea', getFEAInputs(), updateFEAUI, null), 300);
+        const debouncedFatigueSim = debounce(() => runSimulation('fatigue', getFatigueInputs(), updateFatigueUI, updateFatigueRecs), 300);
+        const debouncedAccuracySim = debounce(() => runSimulation('accuracy', getAccuracyInputs(), updateAccuracyUI, updateAccuracyRecs), 300);
+        const debouncedWarpageSim = debounce(() => runSimulation('warpage', getWarpageInputs(), updateWarpageUI, updateWarpageRecs), 300); // v6: New
+
+        // v4: App State for cleaner logic
+        const AppState = {
+            'kaggle': { runSim: debouncedKaggleSim, getInputs: getKaggleInputs, setInputs: setKaggleInputs, optConfig: getKaggleOptConfig },
+            'c3': { runSim: debouncedC3Sim, getInputs: getC3Inputs, setInputs: setC3Inputs, optConfig: null /* Not supported yet */ },
+            'fea': { runSim: debouncedFEASim, getInputs: getFEAInputs, setInputs: null, optConfig: null },
+            'fatigue': { runSim: debouncedFatigueSim, getInputs: getFatigueInputs, setInputs: null, optConfig: null },
+            'accuracy': { runSim: debouncedAccuracySim, getInputs: getAccuracyInputs, setInputs: null, optConfig: getAccuracyOptConfig },
+            'warpage': { runSim: debouncedWarpageSim, getInputs: getWarpageInputs, setInputs: null, optConfig: getWarpageOptConfig }, // v6: New
+        };
 
         // --- Model Switching Logic ---
         const modelSelector = document.getElementById('modelSelector');
@@ -1489,14 +1619,14 @@
             }
 
             // Run the simulation for the selected model
-            if (selectedModel === 'kaggle') debouncedKaggleSim();
-            else if (selectedModel === 'c3') debouncedC3Sim();
-            else if (selectedModel === 'fea') {
-                if (!scene) init3DViewer(); // Init 3D viewer if not already
-                debouncedFEASim();
+            if (AppState[selectedModel] && AppState[selectedModel].runSim) {
+                AppState[selectedModel].runSim();
             }
-            else if (selectedModel === 'fatigue') debouncedFatigueSim();
-            else if (selectedModel === 'accuracy') debouncedAccuracySim(); // v5: New call
+
+            // Special case: Init 3D viewer for FEA
+            if (selectedModel === 'fea' && !scene) {
+                init3DViewer();
+            }
         }
 
         modelSelector.addEventListener('change', (e) => switchModel(e.target.value));
@@ -1516,19 +1646,17 @@
                 const gcode = e.target.result;
                 const selectedModel = modelSelector.value;
 
+                if (!AppState[selectedModel] || !AppState[selectedModel].setInputs) {
+                    alert(`G-Code parsing is not supported for the ${selectedModel} model.`);
+                    return;
+                }
+
                 try {
-                    // Refactored: Parse all params once
                     const params = parseUnifiedOrcaSlicerGcode(gcode);
                     console.log("Parsed all G-Code params:", params);
 
-                    // Route to the correct setter
-                    if (selectedModel === 'kaggle') {
-                        setKaggleInputs(params);
-                        runKaggleSimulation(); // Re-run simulation
-                    } else if (selectedModel === 'c3') {
-                        setC3Inputs(params);
-                        runC3Simulation(); // Re-run simulation
-                    }
+                    AppState[selectedModel].setInputs(params);
+                    AppState[selectedModel].runSim();
                 } catch (error) {
                     console.error("G-Code parsing error:", error);
                     alert(`Failed to parse G-Code: ${error.message}`);
@@ -1629,6 +1757,7 @@
         }
 
         function setC3Inputs(params) {
+            // C3 params are named differently in G-code, so we map them
             if (params.nozzle_temperature) setSlider('c3_Temperature', params.nozzle_temperature);
             if (params.print_speed) setSlider('c3_Speed', params.print_speed);
             if (params.Angle) setSlider('c3_Angle', params.Angle);
@@ -1718,8 +1847,8 @@
         // Add listeners for all sliders and selects
         const allInputs = document.querySelectorAll('input[type="range"], select');
         allInputs.forEach(input => {
-            // Check if it's one of the new database selects, if so, skip it as it has its own listener
-            if (input.id.includes('_material_database') || input.id === 'modelSelector' || input.id.startsWith('opt')) return;
+            // Check if it's one of the new database selects or optimizer, if so, skip it
+            if (input.id.includes('_material_database') || input.id.startsWith('optimizer')) return;
 
             input.addEventListener('input', () => {
                 // Update text for sliders
@@ -1735,11 +1864,9 @@
 
                 // Trigger the correct simulation
                 const selectedModel = modelSelector.value;
-                if (selectedModel === 'kaggle') debouncedKaggleSim();
-                else if (selectedModel === 'c3') debouncedC3Sim();
-                else if (selectedModel === 'fea') debouncedFEASim();
-                else if (selectedModel === 'fatigue') debouncedFatigueSim();
-                else if (selectedModel === 'accuracy') debouncedAccuracySim(); // v5: New call
+                if (AppState[selectedModel] && AppState[selectedModel].runSim) {
+                    AppState[selectedModel].runSim();
+                }
             });
         });
 
@@ -1750,272 +1877,122 @@
             }
         });
 
-        // --- v4: Tab Switching Logic ---
-        const tabSimulator = document.getElementById('tab-simulator');
-        const tabOptimizer = document.getElementById('tab-optimizer');
-        const contentSimulator = document.getElementById('content-simulator');
-        const contentOptimizer = document.getElementById('content-optimizer');
-
-        tabSimulator.addEventListener('click', () => {
-            tabSimulator.classList.add('active');
-            tabOptimizer.classList.remove('active');
-            contentSimulator.classList.add('active');
-            contentOptimizer.classList.remove('active');
-        });
-
-        tabOptimizer.addEventListener('click', () => {
-            tabOptimizer.classList.add('active');
-            tabSimulator.classList.remove('active');
-            contentOptimizer.classList.add('active');
-            contentSimulator.classList.remove('active');
-            updateOptimizerOptions(); // Update options when tab is clicked
-        });
-
         // --- v4: Optimizer Logic ---
+        const optimizerModelSelector = document.getElementById('optimizerModelSelector');
+        const objectivesContainer = document.getElementById('optimizer-objectives-container');
+        const runOptimizerBtn = document.getElementById('runOptimizer');
+        const optimizerSpinner = document.getElementById('optimizer-spinner');
+        const optimizerError = document.getElementById('optimizer-error-message');
+        const optimizerErrorText = document.getElementById('optimizer-error-text');
+        const optimizerResultsContainer = document.getElementById('optimizer-results-container');
+        const optimizerResultsHead = document.getElementById('optimizer-results-head');
+        const optimizerResultsBody = document.getElementById('optimizer-results-body');
 
-        // Config for optimizer
-        const OPTIMIZER_CONFIG = {
-            "kaggle": {
-                outputs: [
-                    { name: "tensile_strength", label: "Tensile Strength (MPa)" },
-                    { name: "roughness", label: "Roughness (µm)" },
-                    { name: "elongation", label: "Elongation (%)" },
-                ],
-                params: [
-                    { name: "layer_height", label: "Layer Height (mm)" },
-                    { name: "wall_thickness", label: "Wall Thickness (layers)" },
-                    { name: "infill_density", label: "Infill Density (%)" },
-                    { name: "nozzle_temperature", label: "Nozzle Temp (°C)" },
-                    { name: "bed_temperature", label: "Bed Temp (°C)" },
-                    { name: "print_speed", label: "Print Speed (mm/s)" },
-                    { name: "fan_speed", label: "Fan Speed (%)" },
-                ]
-            },
-            "accuracy": { // v5: New Optimizer Config
-                outputs: [
-                    { name: "Var_Length_percent", label: "% Variation in Length" },
-                    { name: "Var_Width_percent", label: "% Variation in Width" },
-                    { name: "Var_Thickness_percent", label: "% Variation in Thickness" },
-                ],
-                params: [
-                    { name: "Layer_Thickness_mm", label: "Layer Thickness (mm)" },
-                    { name: "Build_Orientation_deg", label: "Build Orientation (°)" },
-                    { name: "Infill_Density_percent", label: "Infill Density (%)" },
-                    { name: "Number_of_Contours", label: "Number of Contours" },
-                ]
-            }
-            // Add other models (C3, Fatigue, FEA) here as they become supported
+        // Config for Optimizer Objectives
+        function getKaggleOptConfig() {
+            return [
+                { name: "tensile_strength", label: "Tensile Strength (MPa)", goal: "maximize" },
+                { name: "roughness", label: "Roughness (µm)", goal: "minimize" },
+                { name: "elongation", label: "Elongation (%)", goal: "maximize" },
+                { name: "estimated_print_time_min", label: "Print Time (min)", goal: "minimize" },
+                { name: "estimated_cost_usd", label: "Material Cost (USD)", goal: "minimize" }
+            ];
+        }
+        function getAccuracyOptConfig() {
+            return [
+                { name: "Var_Length_percent", label: "Length Error (%)", goal: "minimize" },
+                { name: D, "Var_Width_percent", label: "Width Error (%)", goal: "minimize" },
+                { name: "Var_Thickness_percent", label: "Thickness Error (%)", goal: "minimize" },
+                { name: "estimated_print_time_min", label: "Print Time (min)", goal: "minimize" },
+                { name: "estimated_cost_usd", label: "Material Cost (USD)", goal: "minimize" }
+            ];
+        }
+        function getWarpageOptConfig() { // v6: New
+            return [
+                { name: "Warpage_mm", label: "Warpage (mm)", goal: "minimize" },
+                { name: "estimated_print_time_min", label: "Print Time (min)", goal: "minimize" },
+                { name: "estimated_cost_usd", label: "Material Cost (USD)", goal: "minimize" }
+            ];
+        }
+
+        const optimizerConfigs = {
+            'kaggle': getKaggleOptConfig,
+            'accuracy': getAccuracyOptConfig,
+            'warpage': getWarpageOptConfig // v6: New
         };
 
-        const optModelSelector = document.getElementById('optModelSelector');
-        const optObjectivesContainer = document.getElementById('optObjectivesContainer');
-        const optConstraintsContainer = document.getElementById('optConstraintsContainer');
-
-        let objectiveCount = 0;
-        let constraintCount = 0;
-
-        function updateOptimizerOptions() {
-            const modelName = optModelSelector.value;
-            const config = OPTIMIZER_CONFIG[modelName];
-
-            if (!config) {
-                optObjectivesContainer.innerHTML = '<p class="text-sm text-gray-400">This model is not yet supported by the optimizer.</p>';
-                optConstraintsContainer.innerHTML = '';
+        function updateOptimizerUI() {
+            const modelName = optimizerModelSelector.value;
+            const configFn = optimizerConfigs[modelName];
+            if (!configFn) {
+                objectivesContainer.innerHTML = '<label class="block text-sm font-medium text-gray-300">2. Define Objectives</label><p class="text-sm text-red-400">Optimization is not supported for this model yet.</p>';
                 return;
             }
 
-            // Reset containers
-            optObjectivesContainer.innerHTML = '';
-            optConstraintsContainer.innerHTML = '';
-            objectiveCount = 0;
-            constraintCount = 0;
+            const objectives = configFn();
+            let html = '<label class="block text-sm font-medium text-gray-300 mb-2">2. Define Objectives (Max 3)</label>';
 
-            // Create combined list of outputs + cost/time for objectives
-            const allOutputs = [
-                ...config.outputs,
-                { name: "estimated_cost_usd", label: "Estimated Cost ($)" },
-                { name: "estimated_print_time_min", label: "Estimated Time (min)" }
-            ];
-
-            const allParams = config.params;
-
-            // Add first objective (required)
-            addObjective(allOutputs, allParams, false);
-            // Add first constraint (optional)
-            addConstraint(allParams, false);
-        }
-
-        function createSelect(options, id, name) {
-            const select = document.createElement('select');
-            select.id = id;
-            select.name = name;
-            select.className = "w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2";
-            options.forEach(opt => {
-                const optionEl = new Option(opt.label, opt.name);
-                select.add(optionEl);
+            objectives.forEach(obj => {
+                html += `
+                    <div class="flex items-center">
+                        <input id="opt-obj-${obj.name}" type="checkbox" data-name="${obj.name}" data-goal="${obj.goal}" class="opt-objective-cb h-4 w-4 bg-gray-700 border-gray-600 text-blue-600 rounded focus:ring-blue-500">
+                        <label for="opt-obj-${obj.name}" class="ml-2 block text-sm text-gray-300">
+                            ${obj.goal === 'maximize' ? 'Maximize' : 'Minimize'}: ${obj.label}
+                        </label>
+                    </div>
+                `;
             });
-            return select;
+
+            objectivesContainer.innerHTML = html;
         }
 
-        function addObjective(allOutputs, allParams, canRemove = true) {
-            objectiveCount++;
-            const div = document.createElement('div');
-            div.id = `obj_row_${objectiveCount}`;
-            div.className = 'grid grid-cols-12 gap-2 items-center';
+        optimizerModelSelector.addEventListener('change', updateOptimizerUI);
 
-            // Goal (Min/Max) Select
-            const goalSelect = createSelect([
-                { label: "Minimize", name: "minimize" },
-                { label: "Maximize", name: "maximize" }
-            ], `obj_goal_${objectiveCount}`, 'obj_goal');
-            goalSelect.className += ' col-span-4';
+        runOptimizerBtn.addEventListener('click', async () => {
+            const modelName = optimizerModelSelector.value;
 
-            // Property Select
-            const propSelect = createSelect(allOutputs, `obj_prop_${objectiveCount}`, 'obj_prop');
-            propSelect.className += ' col-span-7';
-
-            // Remove Button
-            const removeBtn = document.createElement('button');
-            removeBtn.innerHTML = '&times;';
-            removeBtn.className = 'col-span-1 text-red-400 font-bold text-2xl hover:text-red-300';
-            removeBtn.onclick = () => div.remove();
-
-            div.appendChild(goalSelect);
-            div.appendChild(propSelect);
-            if (canRemove) div.appendChild(removeBtn);
-
-            optObjectivesContainer.appendChild(div);
-        }
-
-        function addConstraint(allParams, canRemove = true) {
-            constraintCount++;
-            const div = document.createElement('div');
-            div.id = `con_row_${constraintCount}`;
-            div.className = 'grid grid-cols-12 gap-2 items-center';
-
-            // Property Select
-            const propSelect = createSelect(allParams, `con_prop_${constraintCount}`, 'con_prop');
-            propSelect.className += ' col-span-5';
-
-            // Operator Select
-            const opSelect = createSelect([
-                { label: "<=", name: "lt" },
-                { label: ">=", name: "gt" }
-            ], `con_op_${constraintCount}`, 'con_op');
-            opSelect.className += ' col-span-3';
-
-            // Value Input
-            const valInput = document.createElement('input');
-            valInput.type = 'number';
-            valInput.id = `con_val_${constraintCount}`;
-            valInput.name = 'con_val';
-            valInput.className = 'col-span-3 w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2';
-            valInput.placeholder = 'Value';
-
-            // Remove Button
-            const removeBtn = document.createElement('button');
-            removeBtn.innerHTML = '&times;';
-            removeBtn.className = 'col-span-1 text-red-400 font-bold text-2xl hover:text-red-300';
-            removeBtn.onclick = () => div.remove();
-
-            div.appendChild(propSelect);
-            div.appendChild(opSelect);
-            div.appendChild(valInput);
-            if (canRemove) div.appendChild(removeBtn);
-
-            optConstraintsContainer.appendChild(div);
-        }
-
-        // Add Objective/Constraint Button Listeners
-        document.getElementById('addObjectiveBtn').addEventListener('click', () => {
-            const config = OPTIMIZER_CONFIG[optModelSelector.value];
-            const allOutputs = [
-                ...config.outputs,
-                { name: "estimated_cost_usd", label: "Estimated Cost ($)" },
-                { name: "estimated_print_time_min", label: "Estimated Time (min)" }
-            ];
-            addObjective(allOutputs, config.params, true);
-        });
-
-        document.getElementById('addConstraintBtn').addEventListener('click', () => {
-            const config = OPTIMIZER_CONFIG[optModelSelector.value];
-            addConstraint(config.params, true);
-        });
-
-        // Update options when model selection changes
-        optModelSelector.addEventListener('change', updateOptimizerOptions);
-
-        // Run Optimization
-        const runOptimizationBtn = document.getElementById('runOptimizationBtn');
-        const optSpinner = document.getElementById('optSpinner');
-        const optBtnText = document.getElementById('optBtnText');
-        const optErrorMsg = document.getElementById('optErrorMsg');
-        const optErrorText = document.getElementById('optErrorText');
-        const optResultsContainer = document.getElementById('optResultsContainer');
-        const optPlaceholder = document.getElementById('optPlaceholder');
-        const optResultsHeader = document.getElementById('optResultsHeader');
-        const optResultsBody = document.getElementById('optResultsBody');
-
-        runOptimizationBtn.addEventListener('click', async () => {
-            // 1. Show loading state
-            runOptimizationBtn.disabled = true;
-            optSpinner.classList.remove('hidden');
-            optBtnText.textContent = 'Optimizing...';
-            optErrorMsg.classList.add('hidden');
-            optPlaceholder.classList.remove('hidden');
-            optResultsContainer.classList.add('hidden');
-
-            let globalInputs;
-            try {
-                // 2. Get Global Inputs
-                globalInputs = getGlobalInputs();
-            } catch (error) {
-                optErrorText.textContent = error.message;
-                optErrorMsg.classList.remove('hidden');
-                runOptimizationBtn.disabled = false;
-                optSpinner.classList.add('hidden');
-                optBtnText.textContent = 'Run Optimization';
+            // 1. Get Global Inputs
+            const globalInputs = getGlobalInputs();
+            if (!globalInputs.part_mass_g || !globalInputs.filament_cost_kg) {
+                alert("Please set a valid 'Filament Used (g)' and 'Filament Cost ($/kg)' in the Global Settings card first.");
                 return;
             }
 
-            // 3. Get Objectives
-            const objectives = [];
-            document.querySelectorAll('[name="obj_goal"]').forEach((goalEl, i) => {
-                const propEl = document.getElementById(`obj_prop_${i + 1}`);
-                objectives.push({
-                    name: propEl.value,
-                    goal: goalEl.value
-                });
-            });
+            // 2. Get Selected Objectives
+            const objectiveCheckboxes = document.querySelectorAll('.opt-objective-cb:checked');
+            if (objectiveCheckboxes.length === 0 || objectiveCheckboxes.length > 3) {
+                alert("Please select 1 to 3 objectives to optimize.");
+                return;
+            }
 
-            // 4. Get Constraints
+            const objectives = Array.from(objectiveCheckboxes).map(cb => ({
+                name: cb.dataset.name,
+                goal: cb.dataset.goal
+            }));
+
+            // 3. (Optional) Get Constraints - Not implemented in this version, but payload supports it
             const constraints = [];
-            document.querySelectorAll('[name="con_prop"]').forEach((propEl, i) => {
-                const opEl = document.getElementById(`con_op_${i + 1}`);
-                const valEl = document.getElementById(`con_val_${i + 1}`);
-                if (valEl.value) { // Only add if a value is entered
-                    constraints.push({
-                        name: propEl.value,
-                        operator: opEl.value,
-                        value: parseFloat(valEl.value)
-                    });
-                }
-            });
 
-            // 5. Create Request Body
-            const requestBody = {
-                model_name: optModelSelector.value,
+            // 4. Build Request Payload
+            const payload = {
+                model_name: modelName,
                 objectives: objectives,
                 constraints: constraints,
                 global_inputs: globalInputs
             };
 
-            // 6. Run API Call
+            // 5. Show Spinner and run
+            optimizerSpinner.classList.remove('hidden');
+            optimizerError.classList.add('hidden');
+            optimizerResultsContainer.classList.add('hidden');
+            runOptimizerBtn.disabled = true;
+            runOptimizerBtn.textContent = "Optimizing...";
+
             try {
                 const response = await fetch(`${API_BASE_URL}/optimize`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
+                    body: JSON.stringify(payload)
                 });
 
                 if (!response.ok) {
@@ -2024,75 +2001,81 @@
                 }
 
                 const results = await response.json();
-
-                // 7. Display Results
-                displayOptimizationResults(results);
+                displayOptimizerResults(results);
 
             } catch (error) {
                 console.error("Optimization failed:", error);
-                optErrorText.textContent = `Error: ${error.message}`;
-                optErrorMsg.classList.remove('hidden');
+                optimizerErrorText.textContent = `Error: ${error.message}. Is the server running?`;
+                optimizerError.classList.remove('hidden');
             } finally {
-                // 8. Hide loading state
-                runOptimizationBtn.disabled = false;
-                optSpinner.classList.add('hidden');
-                optBtnText.textContent = 'Run Optimization';
+                optimizerSpinner.classList.add('hidden');
+                runOptimizerBtn.disabled = false;
+                runOptimizerBtn.textContent = "Run Optimization";
             }
         });
 
-        function displayOptimizationResults(results) {
+        function displayOptimizerResults(results) {
             if (results.length === 0) {
-                optPlaceholder.innerHTML = '<p>No optimal solutions found. Try relaxing your constraints.</p>';
-                optPlaceholder.classList.remove('hidden');
-                optResultsContainer.classList.add('hidden');
+                optimizerErrorText.textContent = "Optimization ran but returned no valid results. Try different objectives.";
+                optimizerError.classList.remove('hidden');
+                optimizerResultsContainer.classList.add('hidden');
                 return;
             }
 
-            // Clear old results
-            optResultsHeader.innerHTML = '';
-            optResultsBody.innerHTML = '';
+            // --- Build Table Header ---
+            const headers = results[0].inputs;
+            const outputs = results[0].outputs;
 
-            // Get all input and output keys from the first result
-            const inputKeys = Object.keys(results[0].inputs);
-            const outputKeys = Object.keys(results[0].outputs);
+            let headHtml = '<tr>';
+            // Input Headers
+            for (const key of Object.keys(headers)) {
+                headHtml += `<th class="text-left text-xs uppercase text-gray-400">${key.replace(/_/g, ' ')}</th>`;
+            }
+            // Output Headers
+            for (const key of Object.keys(outputs)) {
+                headHtml += `<th class="text-left text-xs uppercase text-blue-300">${key.replace(/_/g, ' ')}</th>`;
+            }
+            headHtml += '</tr>';
+            optimizerResultsHead.innerHTML = headHtml;
 
-            // Create Header Row
-            const headerRow = document.createElement('tr');
-            headerRow.innerHTML += `<th scope="col" class="py-3 px-4">#</th>`;
-            // Add output headers (objectives)
-            outputKeys.forEach(key => {
-                headerRow.innerHTML += `<th scope="col" class="py-3 px-4 bg-blue-900 bg-opacity-30">${key.replace(/_/g, ' ')}</th>`;
-            });
-            // Add input headers (parameters)
-            inputKeys.forEach(key => {
-                headerRow.innerHTML += `<th scope="col" class="py-3 px-4">${key.replace(/_/g, ' ')}</th>`;
-            });
-            optResultsHeader.appendChild(headerRow);
-
-            // Create Body Rows
-            results.forEach((result, i) => {
-                const row = document.createElement('tr');
-                row.className = 'bg-gray-800 border-b border-gray-700';
-
-                row.innerHTML += `<td class="py-2 px-4 font-medium">${i + 1}</td>`;
-                // Add output values
-                outputKeys.forEach(key => {
-                    row.innerHTML += `<td class="py-2 px-4 text-blue-300 font-mono">${result.outputs[key]}</td>`;
-                });
-                // Add input values
-                inputKeys.forEach(key => {
-                    row.innerHTML += `<td class="py-2 px-4 font-mono">${result.inputs[key]}</td>`;
-                });
-                optResultsBody.appendChild(row);
-            });
-
-            optPlaceholder.classList.add('hidden');
-            optResultsContainer.classList.remove('hidden');
+            // --- Build Table Body ---
+            let bodyHtml = '';
+            for (const res of results) {
+                bodyHtml += '<tr>';
+                // Input Values
+                for (const val of Object.values(res.inputs)) {
+                    bodyHtml += `<td class="font-mono text-sm text-gray-300">${val}</td>`;
+                }
+                // Output Values
+                for (const val of Object.values(res.outputs)) {
+                    bodyHtml += `<td class="font-mono text-sm font-bold text-blue-300">${val}</td>`;
+                }
+                bodyHtml += '</tr>';
+            }
+            optimizerResultsBody.innerHTML = bodyHtml;
+            optimizerResultsContainer.classList.remove('hidden');
         }
+
+        // --- Tab Switching Logic ---
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Deactivate all
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+
+                // Activate clicked
+                button.classList.add('active');
+                document.getElementById(`tab-${button.dataset.tab}`).classList.add('active');
+            });
+        });
 
         // --- Initial Run ---
         loadMaterials(); // Load the materials DB first
         switchModel(modelSelector.value); // Then run the default simulation
+        updateOptimizerUI(); // Init optimizer UI
 
     </script>
 </body>

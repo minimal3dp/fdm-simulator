@@ -26,11 +26,12 @@ MODEL_KAGGLE_PATH = os.path.join(MODELS_DIR, "model_kaggle.joblib")
 MODEL_C3_PATH = os.path.join(MODELS_DIR, "model_c3.joblib")
 MODEL_FEA_PATH = os.path.join(MODELS_DIR, "model_fea.joblib")
 MODEL_FATIGUE_PATH = os.path.join(MODELS_DIR, "model_fatigue.joblib")
-MODEL_ACCURACY_PATH = os.path.join(MODELS_DIR, "model_accuracy.joblib") # v5: New Model
+MODEL_ACCURACY_PATH = os.path.join(MODELS_DIR, "model_accuracy.joblib")
+MODEL_WARPAGE_PATH = os.path.join(MODELS_DIR, "model_warpage.joblib") # v6: New Model
 FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
 
 # --- FastAPI App Initialization ---
-app = FastAPI(title="FDM 3D Print Property Simulator API (v5)")
+app = FastAPI(title="FDM 3D Print Property Simulator API (v6)")
 
 # Configure CORS
 app.add_middleware(
@@ -46,7 +47,8 @@ model_kaggle = None
 model_c3 = None
 model_fea = None
 model_fatigue = None
-model_accuracy = None # v5: New Model
+model_accuracy = None
+model_warpage = None # v6: New Model
 fea_target_names = []
 materials_database = {}
 
@@ -127,6 +129,16 @@ class AccuracyOutput(PredictionBase):
     Var_Length_percent: float
     Var_Width_percent: float
     Var_Thickness_percent: float
+    
+# --- v6: Model 6: Warp Deformation ---
+class WarpageInput(GlobalInputs):
+    Layer_Temperature_C: int
+    Infill_Density_percent: int
+    First_Layer_Height_mm: float
+    Other_Layer_Height_mm: float
+
+class WarpageOutput(PredictionBase):
+    Warpage_mm: float
 
 # --- v4: Optimization Pydantic Models ---
 class OptimizationObjective(BaseModel):
@@ -215,7 +227,7 @@ def calculate_cost_time(
 @app.on_event("startup")
 async def startup_event():
     """Load all models and data on server startup."""
-    global model_kaggle, model_c3, model_fea, model_fatigue, model_accuracy, fea_target_names, materials_database
+    global model_kaggle, model_c3, model_fea, model_fatigue, model_accuracy, model_warpage, fea_target_names, materials_database
     
     # Load Materials JSON
     try:
@@ -264,12 +276,18 @@ async def startup_event():
     except Exception as e:
         print(f"Warning: Model file not found at {MODEL_ACCURACY_PATH}. Endpoint for 'accuracy' will be disabled. Error: {e}")
 
+    # v6: Load Model 6: Warpage
+    try:
+        model_warpage = joblib.load(MODEL_WARPAGE_PATH)
+        print(f"Successfully loaded model 'warpage' from {MODEL_WARPAGE_PATH}")
+    except Exception as e:
+        print(f"Warning: Model file not found at {MODEL_WARPAGE_PATH}. Endpoint for 'warpage' will be disabled. Error: {e}")
 
 # --- API Endpoints ---
 
 @app.get("/")
 def read_root():
-    return {"message": "FDM Property Simulator API (v5) is running."}
+    return {"message": "FDM Property Simulator API (v6) is running."}
 
 @app.get("/materials", response_model=Dict[str, dict])
 async def get_materials():
@@ -401,7 +419,7 @@ async def predict_fatigue(inputs: FatigueInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
 
-# --- v5: Endpoint 5: Accuracy (Prediction) ---
+# --- Endpoint 5: Accuracy (Prediction) ---
 @app.post("/predict/accuracy", response_model=AccuracyOutput)
 async def predict_accuracy(inputs: AccuracyInput):
     if model_accuracy is None:
@@ -430,6 +448,33 @@ async def predict_accuracy(inputs: AccuracyInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
 
+# --- v6: Endpoint 6: Warpage (Prediction) ---
+@app.post("/predict/warpage", response_model=WarpageOutput)
+async def predict_warpage(inputs: WarpageInput):
+    if model_warpage is None:
+        raise HTTPException(status_code=503, detail="Warpage model is not loaded.")
+        
+    try:
+        # 1. Get cost/time info
+        param_map = {
+            'infill': inputs.Infill_Density_percent,
+            'layer_height': inputs.Other_Layer_Height_mm, # Use 'other' as main layer height
+            'speed': 60.0 # Warpage model doesn't use speed, use default
+        }
+        cost_time_results = calculate_cost_time(inputs, param_map)
+
+        # 2. Get model prediction
+        features = pd.DataFrame([inputs.dict(exclude={'part_mass_g', 'filament_cost_kg', 'material_name'})])
+        prediction = model_warpage.predict(features)[0]
+        
+        # 3. Combine and return
+        return WarpageOutput(
+            Warpage_mm=prediction,
+            **cost_time_results
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
+
 # --- v4: Optimization Endpoint ---
 
 # Define problem parameters for each model
@@ -449,7 +494,6 @@ KAGGLE_OPT_PARAMS = {
         ("material", ["abs", "pla"])
     ]
 }
-# v5: Add config for Accuracy model
 ACCURACY_OPT_PARAMS = {
     "numeric": [
         ("Layer_Thickness_mm", 0.1, 0.4),
@@ -458,6 +502,16 @@ ACCURACY_OPT_PARAMS = {
         ("Number_of_Contours", 1, 3)
     ],
     "categorical": [] # No categorical variables for this model
+}
+# v6: Add config for Warpage model
+WARPAGE_OPT_PARAMS = {
+    "numeric": [
+        ("Layer_Temperature_C", 190, 210),
+        ("Infill_Density_percent", 10, 30),
+        ("First_Layer_Height_mm", 0.2, 0.4),
+        ("Other_Layer_Height_mm", 0.3, 0.5)
+    ],
+    "categorical": []
 }
 # Add other models as needed...
 
@@ -503,12 +557,18 @@ class OptimizationProblem(Problem):
         for name, _ in param_config.get("categorical", []):
              self.vtype.append(int)
 
-        # Handle integer numeric variables (like 'wall_thickness')
+        # Handle integer numeric variables
+        int_params = [
+            "wall_thickness", "infill_density", "nozzle_temperature", 
+            "bed_temperature", "print_speed", "fan_speed", 
+            "Build_Orientation_deg", "Infill_Density_percent", "Number_of_Contours",
+            "Layer_Temperature_C", "Infill_Density_percent"
+        ]
         for i, (name, _, _) in enumerate(param_config["numeric"]):
-            if name in ["wall_thickness", "infill_density", "nozzle_temperature", "bed_temperature", "print_speed", "fan_speed", "Build_Orientation_deg", "Infill_Density_percent", "Number_of_Contours"]:
+            if name in int_params:
                 self.vtype[i] = int
 
-        super().__init__(n_var=n_var, n_obj=self.n_obj, n_constr=self.n_constr, xl=xl, xu=xu) # vtype=self.vtype - let's round them instead
+        super().__init__(n_var=n_var, n_obj=self.n_obj, n_constr=self.n_constr, xl=xl, xu=xu)
 
     def _evaluate(self, x, out, *args, **kwargs):
         # x is a 2D array (n_solutions, n_vars)
@@ -529,7 +589,8 @@ class OptimizationProblem(Problem):
             # Decode categorical
             for i, name in enumerate(self.categorical_params):
                 cat_index = int(round(sol_vector[n_numeric + i]))
-                sol_dict[name] = self.cat_mappings[f"{name}_reverse"][cat_index]
+                if name in self.cat_mappings:
+                     sol_dict[name] = self.cat_mappings[f"{name}_reverse"][cat_index]
             solutions_df_list.append(sol_dict)
             
         features_df = pd.DataFrame(solutions_df_list)
@@ -555,6 +616,13 @@ class OptimizationProblem(Problem):
             param_map_key = {
                 'infill': 'Infill_Density_percent',
                 'layer_height': 'Layer_Thickness_mm',
+                'speed': 60.0 # Use default
+            }
+        elif self.model_name == "warpage":
+            pred_map["Warpage_mm"] = predictions # Single output model
+            param_map_key = {
+                'infill': 'Infill_Density_percent',
+                'layer_height': 'Other_Layer_Height_mm',
                 'speed': 60.0 # Use default
             }
         else:
@@ -620,6 +688,9 @@ async def optimize(request: OptimizationRequest):
     elif request.model_name == "accuracy":
         model = model_accuracy
         param_config = ACCURACY_OPT_PARAMS
+    elif request.model_name == "warpage":
+        model = model_warpage
+        param_config = WARPAGE_OPT_PARAMS
     # Add 'elif request.model_name == "c3":' etc. here
         
     if model is None:
