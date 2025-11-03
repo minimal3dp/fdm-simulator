@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=2.3.4",
     "pandas>=2.3.3",
     "pydantic>=2.12.3",
+    "pymoo>=0.6.1.5",
     "python-multipart>=0.0.20",
     "scikit-learn>=1.7.2",
     "scikit-optimize>=0.10.2",

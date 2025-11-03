@@ -1,20 +1,16 @@
-# FDM 3D Print Property Simulator
+# FDM 3D Print Property Simulator (v4)
 
-This is a multi-model application that uses machine learning to predict the mechanical properties of FDM 3D-printed parts. It consists of a Python (FastAPI) backend that serves the ML models and an HTML/JavaScript frontend that provides the user interface.
+This is a multi-model FDM 3D print simulator powered by a Python (FastAPI) backend and a pure HTML/JS frontend. It uses machine learning models trained on published research data to predict mechanical properties, fatigue life, and more, based on your slicer settings.
 
-The application allows you to simulate properties based on four different research datasets:
+Version 4 now includes a new "Optimizer" tab!
 
-Kaggle Dataset: Predicts Tensile Strength, Roughness, and Elongation.
+## New in v4: Optimizer
 
-C3 Dataset (Wang et al.): Predicts Tensile Strength and Elongation from raw stress-strain data.
+A new "Optimizer" tab is available. This feature, based on the NSGA-II genetic algorithm, allows you to define your goals (e.g., "Maximize Strength," "Minimize Cost") and will run thousands of simulations to find the Top 5 recommended settings that best balance your objectives.
 
-FEA Dataset (Lee & Tucker): Predicts a full anisotropic material card (100+ properties) for use in FEA software.
-
-Fatigue Dataset (Azadi & Dadashi): Predicts the Fatigue Lifetime (cycles to failure) of a part under load.
+Note: The Optimizer currently supports the "Kaggle Model."
 
 ## Project Structure
-
-Your project should be organized as follows:
 
 ```bash
 fdm-simulator/
@@ -28,94 +24,123 @@ fdm-simulator/
 │   │   ├── 3D_Printing_Data.xlsx - Sheet1.csv
 │   │   └── 1-s2.0-S2352340922000580-mmc1.xlsx - Data.csv
 │   │
-│   └── processed/           # (This folder will be created by the script)
+│   └── processed/           # (This folder will be created)
 │       └── c3_processed_data.csv
 │
-├── models/                  # (This folder will be created by the script)
+├── models/                  # (This folder will be created)
 │   ├── model_kaggle.joblib
 │   ├── model_c3.joblib
 │   ├── model_fea.joblib
+│   ├── fea_target_names.joblib
 │   └── model_fatigue.joblib
 │
-├── pyproject.toml         # Python dependencies
-├── README.md                # These are your project files
-├── run_all_training.py      # RUN THIS
-├── main.py                  # The Python backend server
-└── fdm_simulator.html       # The frontend (open in browser)
-│
-└── pyproject.toml         # Python dependencies
+├── pyproject.toml           # Python dependencies for UV (Updated)
+├── materials.json           # Material datasheet
+├── run_all_training.py      # RUN THIS (trains models & starts server)
+├── main.py                  # The Python backend server (Updated)
+└── fdm_simulator.html       # The frontend (Updated)
 ```
 
-## Quickstart Instructions
+##Setup & First Run
 
-Follow these steps precisely to get the application running.
+Requires Python 3.8+ and uv (or pip).
 
-### Step 1: Environment Setup (with UV)
+Place Your Data:
 
-Create Environment:
-Open your terminal in this project folder and create a new virtual environment:
+Download all 4 raw datasets.
 
+Place them inside the data/raw/ folder.
+
+Create/Update Environment (using UV):
+
+ **Create a new virtual environment (if you haven't)**
 ```bash
 uv venv
 ```
 
-Activate Environment:
-
-macOS / Linux:
-
+ **Activate the environment**
 ```bash
 source .venv/bin/activate
 ```
 
-Windows (PowerShell):
+**Install/Update Dependencies:**
 
-```powershell
-.venv\Scripts\Activate.ps1
-```
+(If this is your first time)
 
-Windows (CMD):
-
-```cmd
-.venv\Scripts\activate.bat
-```
-
-Your terminal prompt should now show (.venv).
-
-Install Dependencies:
-Install all required Python packages:
-
+# This reads pyproject.toml and installs all packages
 ```bash
-uv pip install -r requirements.txt
+uv pip install .
 ```
 
-### Step 2: Download Datasets
+(If you are updating from v3)
 
-Create the data/raw directory in your project folder.
+**This will read the updated pyproject.toml and install pymoo**
+```bash
+uv pip install .
+```
 
-Download data.csv from Kaggle and place it inside the data/raw/ folder.
+### Train Models & Run Server:
 
-Place your C3-RAW DATA.csv file inside the data/raw/ folder.
-
-### Step 3: Process Data and Train Models
-
-In your terminal (with the environment active), run the unified training script. This script will:
-
-Create the data/processed/ and models/ directories.
-
-Process the C3 raw data and save the result.
-
-Train both the Kaggle and C3 models and save them.
-
-Automatically start the server for you.
+This single command will process all data, train all 4 models (if they don't already exist), and then start the FastAPI server.
 
 ```bash
 python run_all_training.py
 ```
 
-Keep this terminal running. It will start the uvicorn server automatically once training is complete.
+The server will be running at http://127.0.0.1:8000.
 
-### Step 4: Open the Frontend
+Use the Application:
 
-Open the fdm_simulator.html file directly in your web browser (e.g., by double-clicking it).
+Keep the server terminal running.
 
-You can now use the application! It will automatically connect to your local server.
+Open the fdm_simulator.html file in your web browser (e.g., by double-clicking it). The app will connect to your local server automatically.
+
+How to Use
+
+Simulator Tab
+
+Global Settings:
+
+Filament Used (g): Enter the estimated filament mass from your slicer.
+
+Filament Cost ($/kg): Enter the cost of your 1kg spool.
+
+Select Model: Choose one of the four simulation models from the dropdown.
+
+Adjust Parameters:
+
+Use the G-Code parser to auto-fill settings (for Kaggle & C3 models).
+
+Use the "Material Datasheet" dropdowns to auto-fill settings (for Kaggle, FEA, & Fatigue models).
+
+Manually adjust the sliders to see how parameters affect the predictions.
+
+Review Predictions:
+
+The "Predicted Properties" card will update in real-time.
+
+This now includes Est. Material Cost and Est. Print Time.
+
+Optimizer Tab (New!)
+
+Select Model: Choose the model you want to optimize for (currently supports "Kaggle Model").
+
+Set Global Settings: Enter your "Filament Used (g)" and "Filament Cost ($/kg)". These are used if you optimize for cost or time.
+
+Define Objectives:
+
+Select a property (e.g., "Tensile Strength") and a goal ("Maximize" or "Minimize").
+
+You can add multiple objectives (e.g., "Maximize Tensile Strength" and "Minimize Cost").
+
+Define Constraints (Optional):
+
+Set limits on your parameters (e.g., "Print Speed" must be "<= 100" mm/s).
+
+Run Optimizer:
+
+Click the "Run Optimizer" button. The backend server will run a genetic algorithm, which may take 20-30 seconds.
+
+Review Results:
+
+The "Optimization Results" table will show the Top 5 recommended parameter sets that provide the best trade-off for your defined goals.
