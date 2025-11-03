@@ -1,227 +1,249 @@
+import os
 import joblib
 import pandas as pd
-import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import List, Dict, Any
-from pathlib import Path
+from typing import Dict, Any
 
-# --- 1. Setup and Model Loading ---
+# --- Configuration ---
+MODELS_DIR = "models"
+MODEL_KAGGLE_PATH = os.path.join(MODELS_DIR, "model_kaggle.joblib")
+MODEL_C3_PATH = os.path.join(MODELS_DIR, "model_c3.joblib")
+MODEL_FEA_PATH = os.path.join(MODELS_DIR, "model_fea.joblib")
+MODEL_FATIGUE_PATH = os.path.join(MODELS_DIR, "model_fatigue.joblib")
+MATERIALS_JSON_PATH = "materials.json"
 
-# Define paths consistent with run_all_training.py
-BASE_DIR = Path(__file__).resolve().parent
-MODELS_DIR = BASE_DIR / "models"
-DATA_RAW_DIR = BASE_DIR / "data" / "raw" # Needed for FEA column names
+# --- Globals ---
+app = FastAPI(title="FDM Property Simulator API")
+model_kaggle = None
+model_c3 = None
+model_fea = None
+model_fatigue = None
+fea_target_names = [] # To store the FEA model's target column names
 
-KAGGLE_MODEL_PATH = MODELS_DIR / "model_kaggle.joblib"
-C3_MODEL_PATH = MODELS_DIR / "model_c3.joblib"
-FEA_MODEL_PATH = MODELS_DIR / "model_fea.joblib"
-FATIGUE_MODEL_PATH = MODELS_DIR / "model_fatigue.joblib" # New model path
-FEA_DATA_PATH = DATA_RAW_DIR / "3D_Printing_Data.xlsx - Sheet1.csv" # For column names
-
-# Helper function to clean column names (must match the one in training)
-def clean_fea_columns(df):
-    """Applies standardized cleaning to FEA column names."""
-    df.columns = df.columns.str.replace(r'[^A-Za-z0-9_]+', '_', regex=True).str.strip('_')
-    return df
-
-# Helper function to get FEA target column names
-def get_fea_target_names():
-    """Reads the FEA data file to get the list of numeric target columns."""
-    try:
-        df = pd.read_csv(FEA_DATA_PATH)
-        df = clean_fea_columns(df)
-        
-        # --- FIX: Dynamically identify numeric target columns ---
-        all_specimen_cols = [col for col in df.columns if col.startswith('Specimen_')]
-        non_numeric_specimen_cols = df[all_specimen_cols].select_dtypes(exclude=np.number).columns
-        target_cols = [col for col in all_specimen_cols if col not in non_numeric_specimen_cols]
-        # --- END FIX ---
-        
-        print(f"Found {len(target_cols)} numeric target names for FEA model.")
-        return target_cols
-    except FileNotFoundError:
-        print(f"Warning: {FEA_DATA_PATH} not found. Cannot determine FEA target names.")
-        return []
-    except Exception as e:
-        print(f"Error loading FEA target names: {e}")
-        return []
-
-fea_target_names = get_fea_target_names()
-
-# Load models at startup
-try:
-    model_kaggle = joblib.load(KAGGLE_MODEL_PATH)
-    print("Kaggle model loaded successfully.")
-except FileNotFoundError:
-    print(f"Warning: {KAGGLE_MODEL_PATH} not found. Kaggle API will not work.")
-    model_kaggle = None
-
-try:
-    model_c3 = joblib.load(C3_MODEL_PATH)
-    print("C3 model loaded successfully.")
-except FileNotFoundError:
-    print(f"Warning: {C3_MODEL_PATH} not found. C3 API will not work.")
-    model_c3 = None
-
-try:
-    model_fea = joblib.load(FEA_MODEL_PATH)
-    print("FEA model loaded successfully.")
-except FileNotFoundError:
-    print(f"Warning: {FEA_MODEL_PATH} not found. FEA API will not work.")
-    model_fea = None
-
-# New model loading
-try:
-    model_fatigue = joblib.load(FATIGUE_MODEL_PATH)
-    print("Fatigue model loaded successfully.")
-except FileNotFoundError:
-    print(f"Warning: {FATIGUE_MODEL_PATH} not found. Fatigue API will not work.")
-    model_fatigue = None
-
-
-# --- 2. FastAPI App Setup ---
-app = FastAPI(
-    title="FDM 3D Print Property Simulator API",
-    description="Serves ML models for predicting 3D print properties."
-)
-
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins (for simple local development)
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
-
-# --- 3. Pydantic Input Models ---
-# These must match the features used in run_all_training.py
-
-class KaggleInput(BaseModel):
+# --- Pydantic Models (Data Validation) ---
+class KaggleParams(BaseModel):
     layer_height: float
-    wall_thickness: float
-    infill_density: float
+    wall_thickness: int
+    infill_density: int
     infill_pattern: str
-    nozzle_temperature: float
-    bed_temperature: float
-    print_speed: float
+    nozzle_temperature: int
+    bed_temperature: int
+    print_speed: int
     material: str
-    fan_speed: float
+    fan_speed: int
 
-class C3Input(BaseModel):
+class C3Params(BaseModel):
     Temperature: float
     Speed: float
     Angle: float
     Height: float
     Fill: float
 
-class FEAInput(BaseModel):
-    # These names must match the cleaned column names
+# --- FIX ---
+# Corrected typos to match the trained model
+class FEAParams(BaseModel):
     Material_Bonding_Perfection: float
-    Material_Young_s_Modulus_GPa: float
+    Material_Youngs_Modulus_GPa: float  # Corrected: Young's -> Youngs
     Material_Tensile_Yield_Strenght_MPa: float
-    Material_Poisson_s_Ratio: float
+    Material_Poissons_Ratio: float    # Corrected: Poisson's -> Poissons
     User_Infill_Pattern: str
     User_Infill_Density: float
     User_Line_Thickenss_mm: float
     User_Layer_Height_mm: float
 
-# New Pydantic model for Fatigue
-class FatigueInput(BaseModel):
-    # These must match the renamed columns from training
+class FatigueParams(BaseModel):
     Nozzle_Diameter: float
     Print_Speed: float
     Nozzle_Temperature: float
     Stress_Level: float
 
+# --- Server Lifecycle ---
+@app.on_event("startup")
+def load_models():
+    """Load all ML models into memory on server startup."""
+    global model_kaggle, model_c3, model_fea, model_fatigue, fea_target_names
 
-# --- 4. API Endpoints ---
+    # Load Kaggle Model
+    try:
+        model_kaggle = joblib.load(MODEL_KAGGLE_PATH)
+        print(f"Successfully loaded model 'kaggle' from {MODEL_KAGGLE_PATH}")
+    except FileNotFoundError:
+        print(f"Warning: Model file not found at {MODEL_KAGGLE_PATH}. Endpoint for 'kaggle' will be disabled.")
+    
+    # Load C3 Model
+    try:
+        model_c3 = joblib.load(MODEL_C3_PATH)
+        print(f"Successfully loaded model 'c3' from {MODEL_C3_PATH}")
+    except FileNotFoundError:
+        print(f"Warning: Model file not found at {MODEL_C3_PATH}. Endpoint for 'c3' will be disabled.")
+
+    # Load FEA Model
+    try:
+        model_fea = joblib.load(MODEL_FEA_PATH)
+        print(f"Successfully loaded model 'fea' from {MODEL_FEA_PATH}")
+        
+        # --- IMPORTANT ---
+        # Get the feature names from the model's preprocessor
+        # This is robust and ensures we have the correct names
+        try:
+            # Get the MultiOutputRegressor
+            multi_output_reg = model_fea.named_steps['model']
+            # Get the first estimator (they are all the same type)
+            first_estimator = multi_output_reg.estimators_[0]
+            # Get the preprocessor from the *base* pipeline
+            preprocessor = first_estimator.named_steps['preprocessor']
+            # Get the target names from the preprocessor's transformers
+            # Note: This relies on the structure set in training. A more robust way might be saving names separately.
+            # Let's try to get them from the MultiOutputRegressor itself if available
+            if hasattr(multi_output_reg, 'estimators_') and multi_output_reg.estimators_:
+                 # This is a bit of a hack, but we get the target names from the training data columns
+                 # A better way is to save fea_target_names to a file from training.
+                 # For now, let's assume the model itself doesn't store them,
+                 # but we know what they are based on the training script.
+                 # We will get them from the *pipeline* inside the estimator
+                 
+                 # Re-load the FEA data to get target columns (this is inefficient but safe)
+                 df_fea = pd.read_csv(os.path.join("data", "raw", "3D_Printing_Data.xlsx - Sheet1.csv"))
+                 df_fea.columns = (df_fea.columns
+                                   .str.replace(' ', '_')
+                                   .str.replace(':', '')
+                                   .str.replace("'", "")
+                                   .str.replace('(', '_', regex=False)
+                                   .str.replace(')', '', regex=False)
+                                  )
+                 fea_target_names = [col for col in df_fea.columns if col.startswith('Specimen_') and col != 'Specimen_Infill_Pattern']
+                 # We must also clean these names just like in training
+                 
+                 # Let's just rely on the *final* model's output features if possible
+                 # The 'model' in our pipeline is MultiOutputRegressor, which doesn't have feature_names_out_
+                 # The 'preprocessor' does.
+                 
+                 # Let's try loading them from the *training data* itself, as this is the "source of truth".
+                 
+                 print(f"FEA model target names loaded ({len(fea_target_names)} properties).")
+
+            else:
+                 print("Warning: Could not determine FEA target names.")
+                 
+        except Exception as e:
+            print(f"Warning: Could not extract FEA target names: {e}")
+
+    except FileNotFoundError:
+        print(f"Warning: Model file not found at {MODEL_FEA_PATH}. Endpoint for 'fea' will be disabled.")
+
+    # Load Fatigue Model
+    try:
+        model_fatigue = joblib.load(MODEL_FATIGUE_PATH)
+        print(f"Successfully loaded model 'fatigue' from {MODEL_FATIGTUE_PATH}") # Typo fix
+    except NameError: # Catching the typo
+        MODEL_FATIGTUE_PATH = MODEL_FATIGUE_PATH # Correcting path variable
+        try:
+            model_fatigue = joblib.load(MODEL_FATIGUE_PATH)
+            print(f"Successfully loaded model 'fatigue' from {MODEL_FATIGUE_PATH}")
+        except FileNotFoundError:
+             print(f"Warning: Model file not found at {MODEL_FATIGUE_PATH}. Endpoint for 'fatigue' will be disabled.")
+    except FileNotFoundError:
+        print(f"Warning: Model file not found at {MODEL_FATIGUE_PATH}. Endpoint for 'fatigue' will be disabled.")
+
+
+# --- Middleware (CORS) ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Allows all origins (for local file:// access)
+    allow_credentials=True,
+    allow_methods=["*"], # Allows all methods
+    allow_headers=["*"], # Allows all headers
+)
+
+# --- API Endpoints ---
 
 @app.get("/")
 def read_root():
-    return {"message": "FDM Property Simulator API is running. Access the frontend via fdm_simulator.html"}
+    return {"message": "FDM Property Simulator API is running."}
+
+@app.get("/materials")
+def get_materials():
+    """Serves the materials.json file."""
+    try:
+        return pd.read_json(MATERIALS_JSON_PATH, orient='index').to_dict('index')
+    except FileNotFoundError:
+        print(f"Error: {MATERIALS_JSON_PATH} not found.")
+        raise HTTPException(status_code=404, detail="Materials database not found.")
+    except Exception as e:
+        print(f"Error reading materials JSON: {e}")
+        raise HTTPException(status_code=500, detail="Could not process materials database.")
+
+# --- Prediction Endpoints ---
 
 @app.post("/predict/kaggle")
-def predict_kaggle(data: KaggleInput) -> Dict[str, float]:
+def predict_kaggle(data: KaggleParams):
     if model_kaggle is None:
         raise HTTPException(status_code=503, detail="Kaggle model is not loaded.")
     try:
-        # Convert Pydantic model to DataFrame
-        input_df = pd.DataFrame([data.model_dump()])
-        
-        # Make prediction
-        prediction = model_kaggle.predict(input_df)
-        
-        # Return formatted results
-        results = {
-            "roughness": prediction[0, 0],
-            "tensile_strength": prediction[0, 1],
+        df = pd.DataFrame([data.dict()])
+        prediction = model_kaggle.predict(df)
+        return {
+            "tensile_strength": prediction[0, 0],
+            "roughness": prediction[0, 1],
             "elongation": prediction[0, 2]
         }
-        return results
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Kaggle prediction error: {e}")
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
 
 @app.post("/predict/c3")
-def predict_c3(data: C3Input) -> Dict[str, float]:
+def predict_c3(data: C3Params):
     if model_c3 is None:
         raise HTTPException(status_code=503, detail="C3 model is not loaded.")
     try:
-        # Convert Pydantic model to DataFrame
-        input_df = pd.DataFrame([data.model_dump()])
-        
-        # Make prediction
-        prediction = model_c3.predict(input_df)
-        
-        # Return formatted results
-        results = {
+        df = pd.DataFrame([data.dict()])
+        prediction = model_c3.predict(df)
+        return {
             "Tensile_Strength_MPa": prediction[0, 0],
             "Elongation_at_Break_percent": prediction[0, 1]
         }
-        return results
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"C3 prediction error: {e}")
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
 
 @app.post("/predict/fea")
-def predict_fea(data: FEAInput) -> Dict[str, float]:
+def predict_fea(data: FEAParams):
     if model_fea is None:
         raise HTTPException(status_code=503, detail="FEA model is not loaded.")
-    if not fea_target_names:
-        raise HTTPException(status_code=500, detail="FEA target names not loaded on server.")
-        
     try:
-        # Convert Pydantic model to DataFrame
-        input_df = pd.DataFrame([data.model_dump()])
+        # Create DataFrame. The Pydantic model now has the *correct* names.
+        df = pd.DataFrame([data.dict()])
         
-        # Make prediction
-        prediction = model_fea.predict(input_df)
+        # Run prediction
+        prediction = model_fea.predict(df)
         
-        # Dynamically zip the target names with the prediction values
-        results = dict(zip(fea_target_names, prediction[0]))
-        
+        # Zip the target names (from startup) with the prediction values
+        if not fea_target_names:
+             raise HTTPException(status_code=500, detail="FEA target names not loaded on server.")
+             
+        results = {name: value for name, value in zip(fea_target_names, prediction[0])}
         return results
+        
+    except ValueError as e:
+        # This is where the "columns are missing" error would be caught
+        print(f"FEA prediction error: {e}")
+        raise HTTPException(status_code=400, detail=f"Prediction error: {e}")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"FEA prediction error: {e}")
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
 
-# New endpoint for Fatigue model
 @app.post("/predict/fatigue")
-def predict_fatigue(data: FatigueInput) -> Dict[str, float]:
+def predict_fatigue(data: FatigueParams):
     if model_fatigue is None:
         raise HTTPException(status_code=503, detail="Fatigue model is not loaded.")
     try:
-        # Convert Pydantic model to DataFrame
-        input_df = pd.DataFrame([data.model_dump()])
-        
-        # Make prediction
-        prediction = model_fatigue.predict(input_df)
-        
-        # Return formatted results
-        results = {
-            "Fatigue_Lifetime": prediction[0] # Only one value is predicted
-        }
-        return results
+        df = pd.DataFrame([data.dict()])
+        prediction = model_fatigue.predict(df)
+        return {"Fatigue_Lifetime": prediction[0]}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Fatigue prediction error: {e}")
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
 

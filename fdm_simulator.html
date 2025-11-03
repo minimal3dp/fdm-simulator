@@ -123,6 +123,48 @@
             background-color: #374151;
             /* gray-700 */
         }
+
+        /* Tooltip styles */
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip-icon {
+            color: #6b7280;
+            /* gray-500 */
+            cursor: help;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            width: max-content;
+            max-width: 250px;
+            background-color: #1f2937;
+            /* gray-800 */
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 10;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 0.75rem;
+            line-height: 1.25;
+            pointer-events: none;
+            border: 1px solid #374151;
+            /* gray-700 */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -179,99 +221,152 @@
 
                     <!-- Kaggle Model Parameters -->
                     <div id="kaggle-params" class="model-params space-y-4">
-                        <!-- ... Kaggle sliders ... -->
                         <div class="relative group">
-                            <label for="layer_height" class="slider-label"><span>Layer Height (mm)</span><span
-                                    id="layer_height_val" class="slider-value">0.1</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Thickness of each individual printed layer. Smaller is higher quality but slower.
-                            </span>
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-2 flex justify-between items-center">
+                                <span>Material</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Select a common material to pre-fill properties, or set
+                                        them manually below.</span>
+                                </span>
+                            </label>
+                            <select id="kaggle_material_database"
+                                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
+                                <option value="">-- Select Material Preset --</option>
+                                <!-- JS will populate this -->
+                            </select>
+                            <input type="hidden" id="material" value="pla">
+                            <!-- Hidden input for the actual material type -->
+                        </div>
+                        <hr class="border-gray-700" />
+                        <div class="relative group">
+                            <label for="layer_height" class="slider-label">
+                                <span>Layer Height (mm)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Thickness of each individual printed layer. Smaller is
+                                        higher quality but slower.</span>
+                                </span>
+                                <span id="layer_height_val" class="slider-value">0.1</span>
+                            </label>
                             <input type="range" id="layer_height" min="0.02" max="0.3" step="0.01" value="0.1"
                                 class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="wall_thickness" class="slider-label"><span>Wall Thickness (layers)</span><span
-                                    id="wall_thickness_val" class="slider-value">4</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Number of outer shells (perimeters). More walls = stronger part.
-                            </span>
+                            <label for="wall_thickness" class="slider-label">
+                                <span>Wall Thickness (layers)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Number of outer shells (perimeters). More walls =
+                                        stronger part.</span>
+                                </span>
+                                <span id="wall_thickness_val" class="slider-value">4</span>
+                            </label>
                             <input type="range" id="wall_thickness" min="1" max="10" step="1" value="4" class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="infill_density" class="slider-label"><span>Infill Density (%)</span><span
-                                    id="infill_density_val" class="slider-value">50</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Percentage of material used for the internal support structure. Higher = stronger and
-                                heavier.
-                            </span>
+                            <label for="infill_density" class="slider-label">
+                                <span>Infill Density (%)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Percentage of material used for the internal support
+                                        structure. Higher = stronger and heavier.</span>
+                                </span>
+                                <span id="infill_density_val" class="slider-value">50</span>
+                            </label>
                             <input type="range" id="infill_density" min="10" max="100" step="1" value="50"
                                 class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="nozzle_temperature" class="slider-label"><span>Nozzle Temp (°C)</span><span
-                                    id="nozzle_temperature_val" class="slider-value">220</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Temperature of the extruder. Critical for layer adhesion and strength.
-                            </span>
+                            <label for="nozzle_temperature" class="slider-label">
+                                <span>Nozzle Temp (°C)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Temperature of the extruder. Critical for layer adhesion
+                                        and strength.</span>
+                                </span>
+                                <span id="nozzle_temperature_val" class="slider-value">220</span>
+                            </label>
                             <input type="range" id="nozzle_temperature" min="200" max="250" step="1" value="220"
                                 class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="bed_temperature" class="slider-label"><span>Bed Temp (°C)</span><span
-                                    id="bed_temperature_val" class="slider-value">60</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Temperature of the print surface. Prevents warping and helps with first-layer adhesion.
-                            </span>
+                            <label for="bed_temperature" class="slider-label">
+                                <span>Bed Temp (°C)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Temperature of the print surface. Prevents warping and
+                                        helps with first-layer adhesion.</span>
+                                </span>
+                                <span id="bed_temperature_val" class="slider-value">60</span>
+                            </label>
                             <input type="range" id="bed_temperature" min="50" max="100" step="1" value="60"
                                 class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="print_speed" class="slider-label"><span>Print Speed (mm/s)</span><span
-                                    id="print_speed_val" class="slider-value">60</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Speed of the print head (mm/s). Slower is generally stronger and more accurate.
-                            </span>
+                            <label for="print_speed" class="slider-label">
+                                <span>Print Speed (mm/s)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Speed of the print head (mm/s). Slower is generally
+                                        stronger and more accurate.</span>
+                                </span>
+                                <span id="print_speed_val" class="slider-value">60</span>
+                            </label>
                             <input type="range" id="print_speed" min="40" max="120" step="1" value="60" class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="fan_speed" class="slider-label"><span>Fan Speed (%)</span><span
-                                    id="fan_speed_val" class="slider-value">50</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Cooling fan speed. Higher speed cools the plastic faster, improving overhangs but can
-                                reduce layer bonding.
-                            </span>
+                            <label for="fan_speed" class="slider-label">
+                                <span>Fan Speed (%)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Cooling fan speed. Higher speed cools the plastic faster,
+                                        improving overhangs but can reduce layer bonding.</span>
+                                </span>
+                                <span id="fan_speed_val" class="slider-value">50</span>
+                            </label>
                             <input type="range" id="fan_speed" min="0" max="100" step="1" value="50" class="w-full">
                         </div>
                         <div class="relative group">
                             <label for="infill_pattern" class="block text-sm font-medium text-gray-300 mb-2">Infill
                                 Pattern</label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Geometric shape of the internal infill (e.g., Grid, Honeycomb).
-                            </span>
                             <select id="infill_pattern"
                                 class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
                                 <option value="grid">Grid</option>
                                 <option value="honeycomb">Honeycomb</option>
-                            </select>
-                        </div>
-                        <div class="relative group">
-                            <label for="material" class="block text-sm font-medium text-gray-300 mb-2">Material</label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Type of filament (e.g., PLA, ABS). This model only supports PLA and ABS.
-                            </span>
-                            <select id="material"
-                                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
-                                <option value="abs">ABS</option>
-                                <option value="pla">PLA</option>
                             </select>
                         </div>
                     </div>
@@ -280,145 +375,242 @@
                     <div id="c3-params" class="model-params space-y-4 hidden">
                         <!-- ... C3 sliders ... -->
                         <div class="relative group">
-                            <label for="c3_Temperature" class="slider-label"><span>Nozzle Temp (°C)</span><span
-                                    id="c3_Temperature_val" class="slider-value">205</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Temperature of the extruder. Critical for layer adhesion and strength.
-                            </span>
+                            <label for="c3_Temperature" class="slider-label">
+                                <span>Nozzle Temp (°C)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Temperature of the extruder. Critical for layer adhesion
+                                        and strength.</span>
+                                </span>
+                                <span id="c3_Temperature_val" class="slider-value">205</span>
+                            </label>
                             <input type="range" id="c3_Temperature" min="190" max="220" step="1" value="205"
                                 class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="c3_Speed" class="slider-label"><span>Print Speed (mm/s)</span><span
-                                    id="c3_Speed_val" class="slider-value">70</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Speed of the print head (mm/s). Slower is generally stronger.
-                            </span>
+                            <label for="c3_Speed" class="slider-label">
+                                <span>Print Speed (mm/s)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Speed of the print head (mm/s). Slower is generally
+                                        stronger.</span>
+                                </span>
+                                <span id="c3_Speed_val" class="slider-value">70</span>
+                            </label>
                             <input type="range" id="c3_Speed" min="40" max="100" step="1" value="70" class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="c3_Angle" class="slider-label"><span>Raster Angle (°)</span><span
-                                    id="c3_Angle_val" class="slider-value">45</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Raster angle (e.g., 0°, 45°, 90°). The direction lines are printed relative to the
-                                part's X/Y axes.
-                            </span>
+                            <label for="c3_Angle" class="slider-label">
+                                <span>Raster Angle (°)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Raster angle (e.g., 0°, 45°, 90°). The direction lines
+                                        are printed relative to the part's X/Y axes.</span>
+                                </span>
+                                <span id="c3_Angle_val" class="slider-value">45</span>
+                            </label>
                             <input type="range" id="c3_Angle" min="0" max="90" step="15" value="45" class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="c3_Height" class="slider-label"><span>Layer Height (mm)</span><span
-                                    id="c3_Height_val" class="slider-value">0.15</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Thickness of each individual printed layer. Smaller is higher quality but slower.
-                            </span>
+                            <label for="c3_Height" class="slider-label">
+                                <span>Layer Height (mm)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Thickness of each individual printed layer. Smaller is
+                                        higher quality but slower.</span>
+                                </span>
+                                <span id="c3_Height_val" class="slider-value">0.15</span>
+                            </label>
                             <input type="range" id="c3_Height" min="0.1" max="0.2" step="0.01" value="0.15"
                                 class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="c3_Fill" class="slider-label"><span>Infill Density (%)</span><span
-                                    id="c3_Fill_val" class="slider-value">85</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Percentage of material used for the internal support structure. Higher = stronger.
-                            </span>
+                            <label for="c3_Fill" class="slider-label">
+                                <span>Infill Density (%)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Percentage of material used for the internal support
+                                        structure. Higher = stronger.</span>
+                                </span>
+                                <span id="c3_Fill_val" class="slider-value">85</span>
+                            </label>
                             <input type="range" id="c3_Fill" min="70" max="100" step="1" value="85" class="w-full">
                         </div>
                     </div>
 
                     <!-- FEA Model Parameters -->
                     <div id="fea-params" class="model-params space-y-4 hidden">
-                        <h3 class="text-lg font-semibold text-blue-300">Filament Datasheet Properties</h3>
                         <div class="relative group">
-                            <label for="fea_Material_Bonding_Perfection" class="slider-label"><span>Bonding
-                                    Perfection</span><span id="fea_Material_Bonding_Perfection_val"
-                                    class="slider-value">0.5</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                A factor (0.1-1.0) representing how well layers bond. 1.0 is a perfect bond (like
-                                injection molding).
-                            </span>
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-2 flex justify-between items-center">
+                                <span>Filament Datasheet</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Select your filament to auto-fill its base properties
+                                        from its Technical Data Sheet (TDS).</span>
+                                </span>
+                            </label>
+                            <select id="fea_material_database"
+                                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
+                                <option value="">-- Select Material Preset --</option>
+                                <!-- JS will populate this -->
+                            </select>
+                        </div>
+                        <hr class="border-gray-700" />
+                        <h3 class="text-lg font-semibold text-blue-300">Material Properties</h3>
+                        <div class="relative group">
+                            <label for="fea_Material_Bonding_Perfection" class="slider-label">
+                                <span>Bonding Perfection</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">A factor (0.1-1.0) representing how well layers bond. 1.0
+                                        is a perfect bond (like injection molding). 0.5 is a good starting point.</span>
+                                </span>
+                                <span id="fea_Material_Bonding_Perfection_val" class="slider-value">0.5</span>
+                            </label>
                             <input type="range" id="fea_Material_Bonding_Perfection" min="0.1" max="1.0" step="0.01"
                                 value="0.5" class="w-full">
                         </div>
+                        <!-- --- FIX --- -->
+                        <!-- Corrected ID: Young's -> Youngs -->
                         <div class="relative group">
-                            <label for="fea_Material_Young_s_Modulus_GPa" class="slider-label"><span>Young's Modulus
-                                    (GPa)</span><span id="fea_Material_Young_s_Modulus_GPa_val"
-                                    class="slider-value">2.5</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Material stiffness. Find this value on your filament's Technical Data Sheet (TDS).
-                            </span>
-                            <input type="range" id="fea_Material_Young_s_Modulus_GPa" min="1.0" max="5.0" step="0.1"
+                            <label for="fea_Material_Youngs_Modulus_GPa" class="slider-label">
+                                <span>Young's Modulus (GPa)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Material stiffness. Find this value on your filament's
+                                        Technical Data Sheet (TDS).</span>
+                                </span>
+                                <span id="fea_Material_Youngs_Modulus_GPa_val" class="slider-value">2.5</span>
+                            </label>
+                            <input type="range" id="fea_Material_Youngs_Modulus_GPa" min="1.0" max="5.0" step="0.1"
                                 value="2.5" class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="fea_Material_Tensile_Yield_Strenght_MPa" class="slider-label"><span>Tensile
-                                    Strength (MPa)</span><span id="fea_Material_Tensile_Yield_Strenght_MPa_val"
-                                    class="slider-value">50</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Maximum stress the *raw filament* can take. Find this on your filament's TDS.
-                            </span>
+                            <label for="fea_Material_Tensile_Yield_Strenght_MPa" class="slider-label">
+                                <span>Tensile Strength (MPa)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Maximum stress the *raw filament* can take. Find this on
+                                        your filament's TDS.</span>
+                                </span>
+                                <span id="fea_Material_Tensile_Yield_Strenght_MPa_val" class="slider-value">50</span>
+                            </label>
                             <input type="range" id="fea_Material_Tensile_Yield_Strenght_MPa" min="20" max="80" step="1"
                                 value="50" class="w-full">
                         </div>
+                        <!-- --- FIX --- -->
+                        <!-- Corrected ID: Poisson's -> Poissons -->
                         <div class="relative group">
-                            <label for="fea_Material_Poisson_s_Ratio" class="slider-label"><span>Poisson's
-                                    Ratio</span><span id="fea_Material_Poisson_s_Ratio_val"
-                                    class="slider-value">0.35</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Material's tendency to shrink/expand sideways when stretched/compressed. Find this on
-                                your filament's TDS.
-                            </span>
-                            <input type="range" id="fea_Material_Poisson_s_Ratio" min="0.1" max="0.5" step="0.01"
+                            <label for="fea_Material_Poissons_Ratio" class="slider-label">
+                                <span>Poisson's Ratio</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Material's tendency to shrink/expand sideways when
+                                        stretched/compressed. Find this on your filament's TDS. (e.g., 0.3-0.4 for
+                                        PLA/PETG)</span>
+                                </span>
+                                <span id="fea_Material_Poissons_Ratio_val" class="slider-value">0.35</span>
+                            </label>
+                            <input type="range" id="fea_Material_Poissons_Ratio" min="0.1" max="0.5" step="0.01"
                                 value="0.35" class="w-full">
                         </div>
 
                         <h3 class="text-lg font-semibold text-blue-300 mt-4">Slicer Settings</h3>
                         <div class="relative group">
-                            <label for="fea_User_Infill_Density" class="slider-label"><span>Infill Density</span><span
-                                    id="fea_User_Infill_Density_val" class="slider-value">0.5</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Infill percentage (as a decimal, 0.1-1.0) for the part you are simulating.
-                            </span>
+                            <label for="fea_User_Infill_Density" class="slider-label">
+                                <span>Infill Density (0-1)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Infill percentage (as a decimal, 0.1-1.0) for the part
+                                        you are simulating.</span>
+                                </span>
+                                <span id="fea_User_Infill_Density_val" class="slider-value">0.5</span>
+                            </label>
                             <input type="range" id="fea_User_Infill_Density" min="0.1" max="1.0" step="0.01" value="0.5"
                                 class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="fea_User_Line_Thickenss_mm" class="slider-label"><span>Line Thickness
-                                    (mm)</span><span id="fea_User_Line_Thickenss_mm_val"
-                                    class="slider-value">0.4</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Width of a single extruded line (e.g., 0.4mm for a 0.4mm nozzle).
-                            </span>
+                            <label for="fea_User_Line_Thickenss_mm" class="slider-label">
+                                <span>Line Thickness (mm)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Width of a single extruded line (e.g., 0.4mm for a 0.4mm
+                                        nozzle).</span>
+                                </span>
+                                <span id="fea_User_Line_Thickenss_mm_val" class="slider-value">0.4</span>
+                            </label>
                             <input type="range" id="fea_User_Line_Thickenss_mm" min="0.2" max="0.8" step="0.01"
                                 value="0.4" class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="fea_User_Layer_Height_mm" class="slider-label"><span>Layer Height
-                                    (mm)</span><span id="fea_User_Layer_Height_mm_val"
-                                    class="slider-value">0.2</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Thickness of each individual printed layer for the part you are simulating.
-                            </span>
+                            <label for="fea_User_Layer_Height_mm" class="slider-label">
+                                <span>Layer Height (mm)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Thickness of each individual printed layer for the part
+                                        you are simulating.</span>
+                                </span>
+                                <span id="fea_User_Layer_Height_mm_val" class="slider-value">0.2</span>
+                            </label>
                             <input type="range" id="fea_User_Layer_Height_mm" min="0.1" max="0.4" step="0.01"
                                 value="0.2" class="w-full">
                         </div>
                         <div class="relative group">
                             <label for="fea_User_Infill_Pattern"
                                 class="block text-sm font-medium text-gray-300 mb-2">Infill Pattern</label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Geometric shape of the internal infill. This model supports Rectilinear and Concentric.
-                            </span>
                             <select id="fea_User_Infill_Pattern"
                                 class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
                                 <option value="Rectilinear">Rectilinear</option>
@@ -429,49 +621,95 @@
 
                     <!-- Fatigue Model Parameters -->
                     <div id="fatigue-params" class="model-params space-y-4 hidden">
+                        <div class="relative group">
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-2 flex justify-between items-center">
+                                <span>Filament Datasheet</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Select your filament to auto-fill its recommended slicer
+                                        settings for durability.</span>
+                                </span>
+                            </label>
+                            <select id="fatigue_material_database"
+                                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
+                                <option value="">-- Select Material Preset --</option>
+                                <!-- JS will populate this -->
+                            </select>
+                        </div>
+                        <hr class="border-gray-700" />
                         <h3 class="text-lg font-semibold text-blue-300">Part Load</h3>
                         <div class="relative group">
-                            <label for="fatigue_Stress_Level" class="slider-label"><span>Applied Stress Level
-                                    (MPa)</span><span id="fatigue_Stress_Level_val"
-                                    class="slider-value">10</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                The real-world cyclical load (in MegaPascals) you expect the part to endure. This is
-                                *not* a slicer setting. Estimate this based on your part's use case.
-                            </span>
+                            <label for="fatigue_Stress_Level" class="slider-label">
+                                <span>Applied Stress (MPa)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">The real-world cyclical load (in MegaPascals) you expect
+                                        the part to endure. This is *not* a slicer setting. Estimate this based on your
+                                        part's use case or FEA analysis.</span>
+                                </span>
+                                <span id="fatigue_Stress_Level_val" class="slider-value">10</span>
+                            </label>
                             <input type="range" id="fatigue_Stress_Level" min="2.5" max="15" step="0.1" value="10"
                                 class="w-full">
                         </div>
                         <h3 class="text-lg font-semibold text-blue-300 mt-4">Slicer Settings</h3>
                         <div class="relative group">
-                            <label for="fatigue_Nozzle_Diameter" class="slider-label"><span>Nozzle Diameter
-                                    (mm)</span><span id="fatigue_Nozzle_Diameter_val"
-                                    class="slider-value">0.4</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                The diameter of the nozzle used to print the part (e.g., 0.4mm, 0.6mm).
-                            </span>
+                            <label for="fatigue_Nozzle_Diameter" class="slider-label">
+                                <span>Nozzle Diameter (mm)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">The diameter of the nozzle used to print the part (e.g.,
+                                        0.4mm, 0.6mm).</span>
+                                </span>
+                                <span id="fatigue_Nozzle_Diameter_val" class="slider-value">0.4</span>
+                            </label>
                             <input type="range" id="fatigue_Nozzle_Diameter" min="0.2" max="0.6" step="0.1" value="0.4"
                                 class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="fatigue_Print_Speed" class="slider-label"><span>Print Speed (mm/s)</span><span
-                                    id="fatigue_Print_Speed_val" class="slider-value">10</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Speed of the print head (mm/s). Slower is generally stronger and more durable.
-                            </span>
+                            <label for="fatigue_Print_Speed" class="slider-label">
+                                <span>Print Speed (mm/s)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Speed of the print head (mm/s). Slower is generally
+                                        stronger and more durable.</span>
+                                </span>
+                                <span id="fatigue_Print_Speed_val" class="slider-value">10</span>
+                            </label>
                             <input type="range" id="fatigue_Print_Speed" min="5" max="15" step="1" value="10"
                                 class="w-full">
                         </div>
                         <div class="relative group">
-                            <label for="fatigue_Nozzle_Temperature" class="slider-label"><span>Nozzle Temp
-                                    (°C)</span><span id="fatigue_Nozzle_Temperature_val"
-                                    class="slider-value">210</span></label>
-                            <span
-                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                Temperature of the extruder. Critical for layer adhesion and fatigue life.
-                            </span>
+                            <label for="fatigue_Nozzle_Temperature" class="slider-label">
+                                <span>Nozzle Temp (°C)</span>
+                                <span class="tooltip-container">
+                                    <svg class="w-4 h-4 tooltip-icon" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd"
+                                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="tooltip-text">Temperature of the extruder. Critical for layer adhesion
+                                        and fatigue life.</span>
+                                </span>
+                                <span id="fatigue_Nozzle_Temperature_val" class="slider-value">210</span>
+                            </label>
                             <input type="range" id="fatigue_Nozzle_Temperature" min="180" max="240" step="1" value="210"
                                 class="w-full">
                         </div>
@@ -676,51 +914,36 @@
                 </div>
             </div>
 
-        </div> <!-- End of main content grid -->
+        </div>
 
-        <!-- New References Footer -->
-        <footer class="mt-8 pt-8 border-t border-gray-700">
-            <div class="simulator-card">
-                <h2 class="text-2xl font-semibold text-white mb-6">Data Sources & References</h2>
-                <p class="text-gray-400 mb-4">This simulator is built on machine learning models trained using data from
-                    the following academic papers and datasets. The recommendations are also derived from the findings
-                    within this research.</p>
-                <ol class="list-decimal list-inside space-y-4 text-gray-300 text-sm">
+        <!-- Footer: References -->
+        <footer class="mt-12 pt-8 border-t border-gray-700">
+            <h2 class="text-xl font-semibold text-white mb-4">Data Sources & References</h2>
+            <div class="text-gray-400 text-sm space-y-4">
+                <p>This tool is an educational demonstrator. Its predictions are based on machine learning models
+                    trained on publicly available research datasets. Real-world properties may vary.</p>
+                <ol class="list-decimal list-outside ml-6 space-y-2">
                     <li>
-                        <strong>Kaggle Model:</strong> Fumetto, A. (2022). <em>3D Printer Dataset</em>. Kaggle.
-                        Retrieved from <a href="https://www.kaggle.com/datasets/afumetto/3dprinter" target="_blank"
+                        <strong>Kaggle Model:</strong> Based on the "3D Printer (FDM) filament properties" dataset by
+                        Afu. (2022).
+                        <a href="https://www.kaggle.com/datasets/afumetto/3dprinter" target="_blank"
                             rel="noopener noreferrer"
                             class="text-blue-400 hover:underline">kaggle.com/datasets/afumetto/3dprinter</a>
-                        <br>
-                        <span class="text-gray-400 text-xs">(Source for <code>data.csv</code>)</span>
                     </li>
                     <li>
-                        <strong>C3 Model:</strong> Wang, L., Jiang, J., Dong, Y., Ghita, O., Zhu, Y., & Sucala, V. I.
-                        (2024). Machine learning enabled 3D printing parameter settings for desired mechanical
-                        properties. <em>Virtual and Physical Prototyping, 19</em>(1).
-                        <br>
-                        <span class="text-gray-400 text-xs">(Source for <code>C3-RAW DATA.csv</code>)</span>
+                        <strong>C3 Model:</strong> Based on the dataset from Wang, L., Jiang, J., Dong, Y., Ghita, O.,
+                        Zhu, Y., & Sucala, V. I. (2024). Machine learning enabled 3D printing parameter settings for
+                        desired mechanical properties. <em>Virtual and Physical Prototyping, 19</em>(1).
                     </li>
                     <li>
-                        <strong>FEA Model:</strong> Lee, J., & Tucker, C. (2025). Data-Driven 3D-Printed Material Data
-                        Prediction From Benchmark Specimens. <em>ASME Journal of Computing and Information Science in
-                            Engineering, 25</em>(11).
-                        <br>
-                        <span class="text-gray-400 text-xs">(Source for
-                            <code>3D_Printing_Data.xlsx - Sheet1.csv</code>)</span>
+                        <strong>FEA Material Card Model:</strong> Based on the dataset from Lee, J., & Tucker, C.
+                        (2025). Data-Driven 3D-Printed Material Data Prediction From Benchmark Specimens. <em>ASME J.
+                            Comput. Inf. Sci. Eng., 25</em>(11).
                     </li>
                     <li>
-                        <strong>Fatigue Model:</strong> Azadi, M., & Dadashi, A. (2022). Experimental fatigue dataset
-                        for additive-manufactured 3D-printed Polylactic acid biomaterials under fully-reversed
-                        rotating-bending loadings. <em>Data in Brief, 41</em>.
-                        <br>
-                        <span class="text-gray-400 text-xs">(Source for
-                            <code>1-s2.0-S2352340922000580-mmc1.xlsx - Data.csv</code>)</span>
-                    </li>
-                    <li>
-                        <strong>General ML Methodology:</strong> Panico, A., Corvi, A., Collini, L., & Sciancalepore, C.
-                        (2025). Multi objective optimization of FDM 3D printing parameters set via design of experiments
-                        and machine learning algorithms. <em>Scientific Reports, 15</em>.
+                        <strong>Fatigue Lifetime Model:</strong> Based on the dataset from Azadi, M., & Dadashi, A.
+                        (2022). Experimental fatigue dataset for additive-manufactured 3D-printed Polylactic acid
+                        biomaterials... <em>Data in Brief, 41</em>.
                     </li>
                     <li>
                         <strong>General ML Methodology:</strong> Jatti, V.S., Sapre, M.S., Jatti, A.V., Khedkar, N.K., &
@@ -738,7 +961,7 @@
 
     </div>
 
-    <script typeIS="module">
+    <script type="module">
         // === 3D Viewer (three.js) ===
         let scene, camera, renderer, controls, mesh;
 
@@ -844,6 +1067,9 @@
         const errorMessage = document.getElementById('error-message');
         const errorText = document.getElementById('error-text');
 
+        // --- Global State ---
+        let materialsDatabase = {}; // To store materials.json
+
         // --- Input Getters ---
         function getKaggleInputs() {
             return {
@@ -854,7 +1080,7 @@
                 nozzle_temperature: parseInt(document.getElementById('nozzle_temperature').value),
                 bed_temperature: parseInt(document.getElementById('bed_temperature').value),
                 print_speed: parseInt(document.getElementById('print_speed').value),
-                material: document.getElementById('material').value,
+                material: document.getElementById('material').value, // This is the hidden input
                 fan_speed: parseInt(document.getElementById('fan_speed').value),
             };
         }
@@ -870,11 +1096,13 @@
         }
 
         function getFEAInputs() {
+            // --- FIX ---
+            // Corrected keys to match the new Pydantic model and HTML IDs
             return {
                 Material_Bonding_Perfection: parseFloat(document.getElementById('fea_Material_Bonding_Perfection').value),
-                Material_Young_s_Modulus_GPa: parseFloat(document.getElementById('fea_Material_Young_s_Modulus_GPa').value),
+                Material_Youngs_Modulus_GPa: parseFloat(document.getElementById('fea_Material_Youngs_Modulus_GPa').value),
                 Material_Tensile_Yield_Strenght_MPa: parseFloat(document.getElementById('fea_Material_Tensile_Yield_Strenght_MPa').value),
-                Material_Poisson_s_Ratio: parseFloat(document.getElementById('fea_Material_Poisson_s_Ratio').value),
+                Material_Poissons_Ratio: parseFloat(document.getElementById('fea_Material_Poissons_Ratio').value),
                 User_Infill_Pattern: document.getElementById('fea_User_Infill_Pattern').value,
                 User_Infill_Density: parseFloat(document.getElementById('fea_User_Infill_Density').value),
                 User_Line_Thickenss_mm: parseFloat(document.getElementById('fea_User_Line_Thickenss_mm').value),
@@ -1166,34 +1394,77 @@
 
             // Hide GCode parser by default
             gcodeParserContainer.classList.add('hidden');
-Route to the correct parser-- -
-                    if (selectedModel === 'kaggle') {
-                console.log("Parsing G-Code for Kaggle Model...");
-                const params = parseOrcaSlicerGcode_Kaggle(gcode);
-                console.log("Parsed Kaggle params:", params);
-                setKaggleInputs(params);
-                runKaggleSimulation(); // Re-run simulation
-            } else if (selectedModel === 'c3') {
-                console.log("Parsing G-Code for C3 Model...");
-                const params = parseOrcaSlicerGcode_C3(gcode);
-                console.log("Parsed C3 params:", params);
-                setC3Inputs(params);
-                runC3Simulation(); // Re-run simulation
+            hideError();
+
+            // Show containers for the selected model
+            document.getElementById(`${selectedModel}-params`).classList.remove('hidden');
+            document.getElementById(`${selectedModel}-outputs`).classList.remove('hidden');
+            document.getElementById(`${selectedModel}-recs`).classList.remove('hidden');
+
+            // Show GCode parser for Kaggle AND C3
+            if (selectedModel === 'kaggle' || selectedModel === 'c3') {
+                gcodeParserContainer.classList.remove('hidden');
             }
-        } catch (error) {
-            console.error("G-Code parsing error:", error);
-            alert(`Failed to parse G-Code: ${error.message}`);
+
+            // Run the simulation for the selected model
+            if (selectedModel === 'kaggle') {
+                runKaggleSimulation();
+            } else if (selectedModel === 'c3') {
+                runC3Simulation();
+            } else if (selectedModel === 'fea') {
+                if (!scene) init3DViewer(); // Init 3D viewer if not already
+                runFEASimulation();
+            } else if (selectedModel === 'fatigue') {
+                runFatigueSimulation();
+            }
         }
+
+        modelSelector.addEventListener('change', (e) => switchModel(e.target.value));
+
+        // --- G-Code Parsing ---
+        document.getElementById('parseGcodeBtn').addEventListener('click', () => {
+            const fileInput = document.getElementById('gcodeFile');
+            if (fileInput.files.length === 0) {
+                alert("Please select a .gcode file first.");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                const gcode = e.target.result;
+                const selectedModel = modelSelector.value;
+
+                try {
+                    // Refactored: Parse all params once
+                    const params = parseUnifiedOrcaSlicerGcode(gcode);
+                    console.log("Parsed all G-Code params:", params);
+
+                    // Route to the correct setter
+                    if (selectedModel === 'kaggle') {
+                        setKaggleInputs(params);
+                        runKaggleSimulation(); // Re-run simulation
+                    } else if (selectedModel === 'c3') {
+                        setC3Inputs(params);
+                        runC3Simulation(); // Re-run simulation
+                    }
+                } catch (error) {
+                    console.error("G-Code parsing error:", error);
+                    alert(`Failed to parse G-Code: ${error.message}`);
+                }
             };
 
-        reader.readAsText(file);
+            reader.readAsText(file);
         });
 
-        function parseOrcaSlicerGcode_Kaggle(gcode) {
+        // Refactored: Unified G-Code Parser
+        function parseUnifiedOrcaSlicerGcode(gcode) {
             const params = {};
             const lines = gcode.split('\n');
 
             const patterns = {
+                // Kaggle Params
                 layer_height: /; layer_height = ([\d.]+)/,
                 wall_thickness: /; wall_loops = (\d+)/,
                 infill_density: /; sparse_infill_density = ([\d.]+)%/,
@@ -1203,6 +1474,8 @@ Route to the correct parser-- -
                 print_speed: /; outer_wall_speed = ([\d.]+)/,
                 material: /; filament_type = (\w+)/,
                 fan_speed: /; fan_speed = (\d+)/,
+                // C3 Params
+                Angle: /; sparse_infill_angle = (\d+)/,
             };
 
             for (const line of lines) {
@@ -1219,36 +1492,8 @@ Route to the correct parser-- -
                 else if (params.material.toLowerCase().includes('abs')) params.material = 'abs';
             }
 
-            if (Object.keys(params).length < 5) {
-                throw new Error("Could not find enough parameters for Kaggle model. Is this an OrcaSlicer G-Code file?");
-            }
-            return params;
-        }
-
-        // --- NEW FUNCTION for C3 Parsing ---
-        function parseOrcaSlicerGcode_C3(gcode) {
-            const params = {};
-            const lines = gcode.split('\n');
-
-            // Patterns for C3 model parameters
-            const patterns = {
-                Temperature: /; nozzle_temperature = (\d+)/,
-                Speed: /; outer_wall_speed = ([\d.]+)/, // Using outer wall as proxy
-                Angle: /; sparse_infill_angle = (\d+)/,
-                Height: /; layer_height = ([\d.]+)/,
-                Fill: /; sparse_infill_density = ([\d.]+)%/,
-            };
-
-            for (const line of lines) {
-                if (!line.startsWith(';')) continue;
-                for (const [key, regex] of Object.entries(patterns)) {
-                    const match = line.match(regex);
-                    if (match && !params[key]) params[key] = match[1];
-                }
-            }
-
-            if (Object.keys(params).length < 5) {
-                throw new Error("Could not find all 5 parameters for C3 model. Is this an OrcaSlicer G-Code file?");
+            if (Object.keys(params).length < 3) { // Just a basic check
+                console.warn("Could not find many parameters. Is this an OrcaSlicer G-Code file?");
             }
             return params;
         }
@@ -1260,7 +1505,9 @@ Route to the correct parser-- -
                 const min = parseFloat(slider.min);
                 const max = parseFloat(slider.max);
                 // Clamp value to slider's min/max range
-                const clampedValue = Math.max(min, Math.min(max, value));
+                const clampedValue = Math.max(min, Math.min(max, parseFloat(value)));
+                if (isNaN(clampedValue)) return; // Skip if value is not a number
+
                 slider.value = clampedValue;
                 const valEl = document.getElementById(`${id}_val`);
                 if (valEl) valEl.textContent = clampedValue;
@@ -1279,37 +1526,133 @@ Route to the correct parser-- -
             }
         };
 
+        // Updated Input Setters (pull from unified params)
         function setKaggleInputs(params) {
-            if (params.layer_height) setSlider('layer_height', parseFloat(params.layer_height));
-            if (params.wall_thickness) setSlider('wall_thickness', parseInt(params.wall_thickness));
-            if (params.infill_density) setSlider('infill_density', parseFloat(params.infill_density));
-            if (params.nozzle_temperature) setSlider('nozzle_temperature', parseInt(params.nozzle_temperature));
-            if (params.bed_temperature) setSlider('bed_temperature', parseInt(params.bed_temperature));
-            if (params.print_speed) setSlider('print_speed', parseFloat(params.print_speed));
-            if (params.fan_speed) setSlider('fan_speed', parseInt(params.fan_speed));
+            if (params.layer_height) setSlider('layer_height', params.layer_height);
+            if (params.wall_thickness) setSlider('wall_thickness', params.wall_thickness);
+            if (params.infill_density) setSlider('infill_density', params.infill_density);
+            if (params.nozzle_temperature) setSlider('nozzle_temperature', params.nozzle_temperature);
+            if (params.bed_temperature) setSlider('bed_temperature', params.bed_temperature);
+            if (params.print_speed) setSlider('print_speed', params.print_speed);
+            if (params.fan_speed) setSlider('fan_speed', params.fan_speed);
             if (params.infill_pattern) setSelect('infill_pattern', params.infill_pattern);
-            if (params.material) setSelect('material', params.material);
+
+            if (params.material) {
+                // Set the hidden input
+                document.getElementById('material').value = params.material;
+                // Set the visible dropdown
+                const dbSelect = document.getElementById('kaggle_material_database');
+                const option = Array.from(dbSelect.options).find(opt => params.material.toLowerCase().includes(opt.value.toLowerCase()));
+                if (option) dbSelect.value = option.value;
+                else dbSelect.value = ""; // Not a known material
+            }
         }
 
-        // --- NEW FUNCTION for C3 Setting ---
         function setC3Inputs(params) {
-            if (params.Temperature) setSlider('c3_Temperature', parseFloat(params.Temperature));
-            if (params.Speed) setSlider('c3_Speed', parseFloat(params.Speed));
-            if (params.Angle) setSlider('c3_Angle', parseFloat(params.Angle));
-            if (params.Height) setSlider('c3_Height', parseFloat(params.Height));
-            if (params.Fill) setSlider('c3_Fill', parseFloat(params.Fill));
+            if (params.nozzle_temperature) setSlider('c3_Temperature', params.nozzle_temperature);
+            if (params.print_speed) setSlider('c3_Speed', params.print_speed);
+            if (params.Angle) setSlider('c3_Angle', params.Angle);
+            if (params.layer_height) setSlider('c3_Height', params.layer_height);
+            if (params.infill_density) setSlider('c3_Fill', params.infill_density);
         }
+
+        // --- Material Database Logic ---
+        async function loadMaterials() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/materials`);
+                if (!response.ok) throw new Error('Failed to fetch materials');
+                materialsDatabase = await response.json();
+
+                // Get all three select dropdowns
+                const kaggleSelect = document.getElementById('kaggle_material_database');
+                const feaSelect = document.getElementById('fea_material_database');
+                const fatigueSelect = document.getElementById('fatigue_material_database');
+
+                // Populate all dropdowns
+                for (const materialName of Object.keys(materialsDatabase)) {
+                    const option = new Option(materialName, materialName);
+                    // Check which models this material applies to
+                    const materialData = materialsDatabase[materialName];
+                    if (materialData.common && (materialName.toLowerCase().includes('pla') || materialName.toLowerCase().includes('abs'))) {
+                        kaggleSelect.add(option.cloneNode(true));
+                    }
+                    if (materialData.fea) {
+                        feaSelect.add(option.cloneNode(true));
+                    }
+                    if (materialData.fatigue) {
+                        fatigueSelect.add(option.cloneNode(true));
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to load materials database:", error);
+                // Don't show a blocking error, just log it
+            }
+        }
+
+        // Add listeners for the new material dropdowns
+        document.getElementById('kaggle_material_database').addEventListener('change', (e) => {
+            const materialName = e.target.value;
+            if (!materialName || !materialsDatabase[materialName]) return;
+
+            const data = materialsDatabase[materialName].common;
+            const materialType = materialName.toLowerCase().includes('pla') ? 'pla' : 'abs';
+
+            // Set hidden material field
+            document.getElementById('material').value = materialType;
+
+            // Set sliders
+            if (data.bed_temperature) setSlider('bed_temperature', data.bed_temperature);
+            if (data.nozzle_temperature) setSlider('nozzle_temperature', data.nozzle_temperature);
+            if (data.print_speed) setSlider('print_speed', data.print_speed);
+            if (data.fan_speed) setSlider('fan_speed', data.fan_speed);
+
+            debouncedKaggleSim(); // Re-run simulation
+        });
+
+        document.getElementById('fea_material_database').addEventListener('change', (e) => {
+            const materialName = e.target.value;
+            if (!materialName || !materialsDatabase[materialName] || !materialsDatabase[materialName].fea) return;
+
+            const data = materialsDatabase[materialName].fea;
+            // --- FIX ---
+            // Corrected slider IDs to match the HTML
+            if (data.Material_Youngs_Modulus_GPa) setSlider('fea_Material_Youngs_Modulus_GPa', data.Material_Youngs_Modulus_GPa);
+            if (data.Material_Tensile_Yield_Strenght_MPa) setSlider('fea_Material_Tensile_Yield_Strenght_MPa', data.Material_Tensile_Yield_Strenght_MPa);
+            if (data.Material_Poissons_Ratio) setSlider('fea_Material_Poissons_Ratio', data.Material_Poissons_Ratio);
+
+            debouncedFEASim(); // Re-run simulation
+        });
+
+        document.getElementById('fatigue_material_database').addEventListener('change', (e) => {
+            const materialName = e.target.value;
+            if (!materialName || !materialsDatabase[materialName] || !materialsDatabase[materialName].fatigue) return;
+
+            const data = materialsDatabase[materialName].fatigue;
+            if (data.Nozzle_Temperature) setSlider('fatigue_Nozzle_Temperature', data.Nozzle_Temperature);
+            if (data.Print_Speed) setSlider('fatigue_Print_Speed', data.Print_Speed);
+            if (data.Nozzle_Diameter) setSlider('fatigue_Nozzle_Diameter', data.Nozzle_Diameter);
+
+            debouncedFatigueSim(); // Re-run simulation
+        });
 
         // --- Event Listeners ---
 
         // Add listeners for all sliders and selects
         const allInputs = document.querySelectorAll('input[type="range"], select');
         allInputs.forEach(input => {
+            // Check if it's one of the new database selects, if so, skip it as it has its own listener
+            if (input.id.includes('_material_database')) return;
+
             input.addEventListener('input', () => {
                 // Update text for sliders
                 if (input.type === 'range') {
                     const valEl = document.getElementById(`${input.id}_val`);
                     if (valEl) valEl.textContent = input.value;
+                }
+
+                // Special case for Kaggle material: set hidden input
+                if (input.id === 'material') {
+                    document.getElementById('material').value = input.value;
                 }
 
                 // Trigger the correct simulation
@@ -1329,7 +1672,8 @@ Route to the correct parser-- -
         });
 
         // --- Initial Run ---
-        switchModel(modelSelector.value);
+        loadMaterials(); // Load the materials DB first
+        switchModel(modelSelector.value); // Then run the default simulation
 
     </script>
 </body>

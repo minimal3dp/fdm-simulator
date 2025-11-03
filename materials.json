@@ -1,0 +1,74 @@
+{
+    "PLA (Generic)": {
+        "fea": {
+            "Material_Young_s_Modulus_GPa": 2.6,
+            "Material_Tensile_Yield_Strenght_MPa": 50,
+            "Material_Poisson_s_Ratio": 0.36
+        },
+        "fatigue": {
+            "Nozzle_Temperature": 210,
+            "Print_Speed": 10,
+            "Nozzle_Diameter": 0.4
+        },
+        "common": {
+            "bed_temperature": 60,
+            "nozzle_temperature": 210,
+            "print_speed": 60,
+            "fan_speed": 100
+        }
+    },
+    "ABS (Generic)": {
+        "fea": {
+            "Material_Young_s_Modulus_GPa": 2.0,
+            "Material_Tensile_Yield_Strenght_MPa": 40,
+            "Material_Poisson_s_Ratio": 0.35
+        },
+        "fatigue": {
+            "Nozzle_Temperature": 240,
+            "Print_Speed": 8,
+            "Nozzle_Diameter": 0.4
+        },
+        "common": {
+            "bed_temperature": 90,
+            "nozzle_temperature": 240,
+            "print_speed": 60,
+            "fan_speed": 20
+        }
+    },
+    "PETG (Generic)": {
+        "fea": {
+            "Material_Young_s_Modulus_GPa": 2.1,
+            "Material_Tensile_Yield_Strenght_MPa": 45,
+            "Material_Poisson_s_Ratio": 0.37
+        },
+        "fatigue": {
+            "Nozzle_Temperature": 235,
+            "Print_Speed": 8,
+            "Nozzle_Diameter": 0.4
+        },
+        "common": {
+            "bed_temperature": 75,
+            "nozzle_temperature": 235,
+            "print_speed": 50,
+            "fan_speed": 50
+        }
+    },
+    "PC (Polycarbonate)": {
+        "fea": {
+            "Material_Young_s_Modulus_GPa": 2.4,
+            "Material_Tensile_Yield_Strenght_MPa": 60,
+            "Material_Poisson_s_Ratio": 0.37
+        },
+        "fatigue": {
+            "Nozzle_Temperature": 260,
+            "Print_Speed": 5,
+            "Nozzle_Diameter": 0.4
+        },
+        "common": {
+            "bed_temperature": 110,
+            "nozzle_temperature": 260,
+            "print_speed": 40,
+            "fan_speed": 0
+        }
+    }
+}

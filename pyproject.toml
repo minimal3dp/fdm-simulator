@@ -5,6 +5,7 @@ description = "An Application to Simulate FDM 3D Printing Outcomes Using Machine
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiofiles>=25.1.0",
     "fastapi>=0.120.4",
     "jinja2>=3.1.6",
     "joblib>=1.5.2",
