@@ -9,51 +9,61 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.multioutput import MultiOutputRegressor
+import re # Import regex library
 
 # --- Configuration ---
-# Define directory paths
-DATA_RAW_DIR = os.path.join("data", "raw")
-DATA_PROCESSED_DIR = os.path.join("data", "processed")
+# ... (rest of the configuration is correct) ...
+DATA_DIR = "data"
+RAW_DIR = os.path.join(DATA_DIR, "raw")
+PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
 MODELS_DIR = "models"
 
-# Input data paths
-PATH_KAGGLE_RAW = os.path.join(DATA_RAW_DIR, "data.csv")
-PATH_C3_RAW = os.path.join(DATA_RAW_DIR, "C3-RAW DATA.csv")
-PATH_FEA_RAW = os.path.join(DATA_RAW_DIR, "3D_Printing_Data.xlsx - Sheet1.csv")
-PATH_FATIGUE_RAW = os.path.join(DATA_RAW_DIR, "1-s2.0-S2352340922000580-mmc1.xlsx - Data.csv")
+# Ensure directories exist
+os.makedirs(PROCESSED_DIR, exist_ok=True)
+os.makedirs(MODELS_DIR, exist_ok=True)
 
-# Processed data paths
-PATH_C3_PROCESSED = os.path.join(DATA_PROCESSED_DIR, "c3_processed_data.csv")
+# File Paths
+PATH_KAGGLE_RAW = os.path.join(RAW_DIR, "data.csv")
+PATH_C3_RAW = os.path.join(RAW_DIR, "C3-RAW DATA.csv")
+PATH_FEA_RAW = os.path.join(RAW_DIR, "3D_Printing_Data.xlsx - Sheet1.csv")
+PATH_FATIGUE_RAW = os.path.join(RAW_DIR, "1-s2.0-S2352340922000580-mmc1.xlsx - Data.csv")
 
-# Model output paths
+PATH_C3_PROCESSED = os.path.join(PROCESSED_DIR, "c3_processed_data.csv")
+
 MODEL_KAGGLE_PATH = os.path.join(MODELS_DIR, "model_kaggle.joblib")
 MODEL_C3_PATH = os.path.join(MODELS_DIR, "model_c3.joblib")
 MODEL_FEA_PATH = os.path.join(MODELS_DIR, "model_fea.joblib")
 MODEL_FATIGUE_PATH = os.path.join(MODELS_DIR, "model_fatigue.joblib")
 
+# Path for FEA target names
+FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
+
 
 # --- Model 1: Kaggle ---
 def train_kaggle_model():
-    """Trains the Kaggle model (Roughness, Tensile Strength, Elongation)."""
+    """Trains the Kaggle model (Tensile, Roughness, Elongation)."""
     print("--- Training Kaggle Model ---")
     try:
         df = pd.read_csv(PATH_KAGGLE_RAW)
-
-        # Define features (X) and targets (y)
+        
+        # Define features and targets
         feature_cols = [
-            'layer_height', 'wall_thickness', 'infill_density', 'infill_pattern',
-            'nozzle_temperature', 'bed_temperature', 'print_speed', 'material', 'fan_speed'
+            "layer_height", "wall_thickness", "infill_density", "infill_pattern",
+            "nozzle_temperature", "bed_temperature", "print_speed", "material", "fan_speed"
         ]
-        target_cols = ['roughness', 'tension_strenght', 'elongation']
+        target_cols = ["tension_strenght", "roughness", "elongation"]
+        
+        # Define numeric and categorical features
+        numeric_features = [
+            "layer_height", "wall_thickness", "infill_density",
+            "nozzle_temperature", "bed_temperature", "print_speed", "fan_speed"
+        ]
+        categorical_features = ["infill_pattern", "material"]
 
         X = df[feature_cols]
         y = df[target_cols]
 
-        # Define preprocessing steps
-        numeric_features = ['layer_height', 'wall_thickness', 'infill_density',
-                            'nozzle_temperature', 'bed_temperature', 'print_speed', 'fan_speed']
-        categorical_features = ['infill_pattern', 'material']
-
+        # Define preprocessing
         numeric_transformer = Pipeline(steps=[('scaler', StandardScaler())])
         categorical_transformer = Pipeline(steps=[('onehot', OneHotEncoder(handle_unknown='ignore'))])
 
@@ -63,15 +73,13 @@ def train_kaggle_model():
                 ('cat', categorical_transformer, categorical_features)
             ])
 
-        # Create the full pipeline with the model
+        # Create the full pipeline
         pipeline = Pipeline(steps=[('preprocessor', preprocessor),
                                    ('model', RandomForestRegressor(n_estimators=100, random_state=42))])
 
         # Train the model
         print("Training Kaggle model...")
         pipeline.fit(X, y)
-
-        # Save the pipeline
         joblib.dump(pipeline, MODEL_KAGGLE_PATH)
         print(f"Kaggle model saved to {MODEL_KAGGLE_PATH}")
 
@@ -88,26 +96,25 @@ def process_c3_data():
     try:
         df = pd.read_csv(PATH_C3_RAW)
         
-        # Clean column names (remove leading/trailing spaces)
-        df.columns = df.columns.str.strip()
-
-        # Group by the unique print parameters
+        # Group by all parameter columns
         group_cols = ['Temperature', 'Speed', 'Angle', 'Height', 'Fill']
         
-        # Calculate max stress (Tensile Strength) and max strain (Elongation) for each group
-        processed = df.groupby(group_cols).agg(
-            Tensile_Strength_MPa=('Stress', 'max'),
-            Elongation_at_Break_percent=('Strain', 'max')
-        ).reset_index()
-        
-        # Convert Elongation from strain (mm/mm) to percentage
-        processed['Elongation_at_Break_percent'] *= 100
-
-        # Save the processed data
-        processed.to_csv(PATH_C3_PROCESSED, index=False)
-        print(f"Processed C3 data saved to {PATH_C3_PROCESSED}")
+        # Calculate max stress (Tensile Strength) and corresponding strain (Elongation)
+        results = []
+        for params, group in df.groupby(group_cols):
+            max_stress_idx = group['Stress'].idxmax()
+            max_stress = group.loc[max_stress_idx, 'Stress']
+            elongation_at_break = group.loc[max_stress_idx, 'Strain']
+            
+            row = list(params) + [max_stress, elongation_at_break * 100] # Strain as %
+            results.append(row)
+            
+        # Create a new DataFrame
+        processed_df = pd.DataFrame(results, columns=group_cols + ['Tensile_Strength_MPa', 'Elongation_at_Break_percent'])
+        processed_df.to_csv(PATH_C3_PROCESSED, index=False)
+        print(f"C3 processed data saved to {PATH_C3_PROCESSED}")
         return True
-
+        
     except FileNotFoundError:
         print(f"Error: Raw data file not found at {PATH_C3_RAW}")
         return False
@@ -116,35 +123,28 @@ def process_c3_data():
         return False
 
 def train_c3_model():
-    """Trains the C3 model (Tensile Strength, Elongation) using processed data."""
+    """Trains the C3 model (Tensile, Elongation) on processed data."""
     print("--- Training C3 Model ---")
     try:
-        # Ensure processed data exists
-        if not os.path.exists(PATH_C3_PROCESSED):
-            if not process_c3_data():
-                print("C3 data processing failed. Aborting C3 model training.")
-                return
-
         df = pd.read_csv(PATH_C3_PROCESSED)
-
+        
         feature_cols = ['Temperature', 'Speed', 'Angle', 'Height', 'Fill']
         target_cols = ['Tensile_Strength_MPa', 'Elongation_at_Break_percent']
-
+        
         X = df[feature_cols]
         y = df[target_cols]
 
-        # Simple StandardScaler as all features are numeric
-        preprocessor = Pipeline(steps=[('scaler', StandardScaler())])
-
-        pipeline = Pipeline(steps=[('preprocessor', preprocessor),
+        # Simple pipeline (all features are numeric)
+        pipeline = Pipeline(steps=[('scaler', StandardScaler()),
                                    ('model', RandomForestRegressor(n_estimators=100, random_state=42))])
-
+        
         print("Training C3 model...")
         pipeline.fit(X, y)
-        
         joblib.dump(pipeline, MODEL_C3_PATH)
         print(f"C3 model saved to {MODEL_C3_PATH}")
-
+        
+    except FileNotFoundError:
+        print(f"Error: Processed data file not found at {PATH_C3_PROCESSED}. Run processing first.")
     except Exception as e:
         print(f"Error training C3 model: {e}")
 
@@ -156,18 +156,23 @@ def train_fea_model():
     try:
         df = pd.read_csv(PATH_FEA_RAW)
         
-        # --- FIX V3 ---
-        # Correctly clean column names
-        df.columns = (df.columns
-                      .str.replace(' ', '_')
-                      .str.replace(':', '')
-                      .str.replace("'", "") # Remove apostrophes
-                      .str.replace('(', '_', regex=False)
-                      .str.replace(')', '', regex=False)
-                     )
+        # This cleaning logic correctly handles parentheses and apostrophes
+        def clean_col_name(col_name):
+            new_col = col_name.strip()
+            new_col = new_col.replace(' ', '_').replace(':', '').replace("'", "")
+            # *** THIS IS THE FIX ***
+            # The built-in str.replace() does not take a regex= argument.
+            new_col = new_col.replace('(', '_').replace(')', '')
+            # ***********************
+            new_col = new_col.replace('__', '_')
+            # Remove trailing underscores
+            if new_col.endswith('_'):
+                new_col = new_col[:-1]
+            return new_col
+        
+        df.columns = [clean_col_name(col) for col in df.columns]
 
-        # --- FIX V3 ---
-        # Correct typos in feature names (Young's -> Youngs, Poisson's -> Poissons)
+        # Corrected feature names (no apostrophes)
         feature_cols = [
             "Material_Bonding_Perfection", "Material_Youngs_Modulus_GPa", 
             "Material_Tensile_Yield_Strenght_MPa", "Material_Poissons_Ratio",
@@ -190,7 +195,6 @@ def train_fea_model():
             print("Error: No 'Specimen_' target columns found in FEA data.")
             return
 
-        # --- ROBUST FIX V2 ---
         # 1. Define all columns that MUST be numeric
         numeric_cols_to_clean = target_cols + numeric_features
         
@@ -199,7 +203,8 @@ def train_fea_model():
 
         # 3. Drop any rows that now contain NaN values in these critical columns
         original_rows = len(df)
-        df = df.dropna(subset=numeric_cols_to_clean) # Clean based on features AND targets
+        # Also drop NaNs in categorical features
+        df = df.dropna(subset=numeric_cols_to_clean + categorical_features) 
         print(f"Dropped {original_rows - len(df)} rows with bad data from FEA dataset.")
             
         print(f"FEA model will predict {len(target_cols)} properties.")
@@ -208,7 +213,6 @@ def train_fea_model():
         y = df[target_cols] # y is clean
 
         # Define preprocessing
-        # We can now be confident the numeric_transformer will only see numbers
         numeric_transformer = Pipeline(steps=[('scaler', StandardScaler())])
         categorical_transformer = Pipeline(steps=[('onehot', OneHotEncoder(handle_unknown='ignore'))])
 
@@ -226,8 +230,11 @@ def train_fea_model():
         print("Training FEA model (this may take a minute)...")
         pipeline.fit(X, y)
 
+        # Save the model AND the target names
         joblib.dump(pipeline, MODEL_FEA_PATH)
         print(f"FEA model saved to {MODEL_FEA_PATH}")
+        joblib.dump(target_cols, FEA_TARGETS_PATH)
+        print(f"FEA target names saved to {FEA_TARGETS_PATH}")
         
     except FileNotFoundError:
         print(f"Error: Raw data file not found at {PATH_FEA_RAW}")
@@ -237,85 +244,77 @@ def train_fea_model():
 
 # --- Model 4: Fatigue ---
 def train_fatigue_model():
-    """Trains the Fatigue model (Fatigue Lifetime)."""
+    """Trains the Fatigue model (Cycles to Failure)."""
     print("--- Training Fatigue Model ---")
     try:
-        # --- FIX ---
-        # Correctly read the CSV, setting header to row 0 and skipping row 1 (units)
+        # Corrected: Read header from row 0, skip row 1 (units)
         df = pd.read_csv(PATH_FATIGUE_RAW, header=0, skiprows=[1])
-
-        # Drop rows with NaN values which can occur from malformed data
-        df = df.dropna(subset=['Nozzle Diameter', 'Print Speed', 'Nozzle Temperature', 'Stress Level', 'Fatigue Lifetime'])
         
         # Clean column names
-        df.columns = df.columns.str.replace(' ', '_').str.replace(r'\[.*\]', '', regex=True)
-
+        df.columns = df.columns.str.replace(' ', '_', regex=False).str.replace('˚', '', regex=False)
+        
         feature_cols = ['Nozzle_Diameter', 'Print_Speed', 'Nozzle_Temperature', 'Stress_Level']
         target_col = 'Fatigue_Lifetime'
-
+        
+        # Drop rows with NaN values in the relevant columns
+        df = df.dropna(subset=feature_cols + [target_col])
+        
         X = df[feature_cols]
         y = df[target_col]
 
-        # Simple StandardScaler as all features are numeric
-        preprocessor = Pipeline(steps=[('scaler', StandardScaler())])
-
-        pipeline = Pipeline(steps=[('preprocessor', preprocessor),
+        # Simple pipeline (all features are numeric)
+        pipeline = Pipeline(steps=[('scaler', StandardScaler()),
                                    ('model', RandomForestRegressor(n_estimators=100, random_state=42))])
-
+        
         print("Training Fatigue model...")
         pipeline.fit(X, y)
-        
         joblib.dump(pipeline, MODEL_FATIGUE_PATH)
         print(f"Fatigue model saved to {MODEL_FATIGUE_PATH}")
 
     except FileNotFoundError:
         print(f"Error: Raw data file not found at {PATH_FATIGUE_RAW}")
-    except KeyError as e:
-        print(f"KeyError: {e}. One of the expected columns is missing or misnamed in {PATH_FATIGUE_RAW}.")
     except Exception as e:
         print(f"Error training Fatigue model: {e}")
 
 
 # --- Main execution ---
 def main():
-    """Main function to create directories, train all models, and start the server."""
+    """Main function to run all processing and training."""
     
-    # Create necessary directories if they don't exist
-    os.makedirs(DATA_PROCESSED_DIR, exist_ok=True)
-    os.makedirs(MODELS_DIR, exist_ok=True)
-    
-    # --- "Smart" Training: Only train if model file is missing ---
-    
+    # Kaggle Model
     if not os.path.exists(MODEL_KAGGLE_PATH):
         train_kaggle_model()
     else:
         print("--- Kaggle Model already trained. Skipping. ---")
-        
+
+    # C3 Model
     if not os.path.exists(MODEL_C3_PATH):
+        if not os.path.exists(PATH_C3_PROCESSED):
+            if not process_c3_data():
+                print("C3 data processing failed. Skipping C3 model training.")
+                return # Stop if processing fails
         train_c3_model()
     else:
         print("--- C3 Model already trained. Skipping. ---")
-        
-    if not os.path.exists(MODEL_FEA_PATH):
+
+    # FEA Model
+    # Check for targets file as well
+    if not os.path.exists(MODEL_FEA_PATH) or not os.path.exists(FEA_TARGETS_PATH):
         train_fea_model()
     else:
         print("--- FEA Model already trained. Skipping. ---")
-        
+
+    # Fatigue Model
     if not os.path.exists(MODEL_FATIGUE_PATH):
         train_fatigue_model()
     else:
         print("--- Fatigue Model already trained. Skipping. ---")
-    
+
     print("\nAll models checked/trained.")
     print("Starting FastAPI server...")
     
     # Start the Uvicorn server as a subprocess
-    try:
-        subprocess.run(["uvicorn", "main:app", "--reload"], check=True)
-    except KeyboardInterrupt:
-        print("\nServer stopped.")
-    except Exception as e:
-        print(f"Failed to start server: {e}")
+    subprocess.run(["uvicorn", "main:app", "--reload"])
 
 if __name__ == "__main__":
     main()
