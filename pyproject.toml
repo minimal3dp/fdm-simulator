@@ -1,0 +1,18 @@
+[project]
+name = "fdm-simulator"
+version = "0.1.0"
+description = "An Application to Simulate FDM 3D Printing Outcomes Using Machine Learning Models"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.120.4",
+    "jinja2>=3.1.6",
+    "joblib>=1.5.2",
+    "numpy>=2.3.4",
+    "pandas>=2.3.3",
+    "pydantic>=2.12.3",
+    "python-multipart>=0.0.20",
+    "scikit-learn>=1.7.2",
+    "scikit-optimize>=0.10.2",
+    "uvicorn>=0.38.0",
+]

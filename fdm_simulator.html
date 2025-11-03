@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-900">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FDM 3D Print Property Simulator</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load three.js for 3D viewer -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .simulator-card {
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            color: #d1d5db;
+            /* gray-300 */
+        }
+
+        .slider-value {
+            font-weight: 600;
+            color: #f9fafb;
+            /* gray-50 */
+        }
+
+        /* Custom slider track */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #374151;
+            /* gray-700 */
+            border-radius: 5px;
+            outline: none;
+            opacity: 0.9;
+            transition: opacity 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            /* blue-500 */
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid #f9fafb;
+            /* gray-50 */
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            /* blue-500 */
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid #f9fafb;
+            /* gray-50 */
+        }
+
+        .output-card {
+            background-color: #1f2937;
+            /* gray-800 */
+            border-radius: 0.5rem;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .output-label {
+            font-size: 0.875rem;
+            color: #9ca3af;
+            /* gray-400 */
+        }
+
+        .output-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #3b82f6;
+            /* blue-500 */
+        }
+
+        #stlCanvas {
+            width: 100%;
+            height: 400px;
+            border-radius: 0.5rem;
+            background-color: #1f2937;
+            /* gray-800 */
+        }
+
+        .fea-table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #1f2937;
+            /* gray-800 */
+            border-radius: 0.5rem;
+        }
+
+        .fea-table th {
+            position: sticky;
+            top: 0;
+            background-color: #374151;
+            /* gray-700 */
+        }
+    </style>
+</head>
+
+<body class="h-full text-gray-100 p-4 md:p-8 bg-gray-900">
+    <div class="max-w-7xl mx-auto">
+
+        <!-- Header -->
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold text-white">FDM 3D Print Property Simulator</h1>
+            <p class="text-lg text-gray-400">Select a model to predict mechanical properties based on process
+                parameters.</p>
+        </header>
+
+        <!-- Model Selector -->
+        <div class="mb-6">
+            <label for="modelSelector" class="block text-sm font-medium text-gray-300 mb-2">Select Simulation
+                Model</label>
+            <select id="modelSelector"
+                class="w-full max-w-md bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="kaggle" selected>Kaggle Model (Strength, Roughness, Elongation)</option>
+                <option value="c3">C3 Model (Tensile Strength & Elongation)</option>
+                <option value="fea">FEA Material Card (Anisotropic Properties)</option>
+                <option value="fatigue">Fatigue Lifetime Model (Cycles to Failure)</option>
+            </select>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Column 1: G-Code Parser & Parameters -->
+            <div class="lg:col-span-1 space-y-6">
+
+                <!-- G-Code Parser (Kaggle & C3 Only) -->
+                <div id="gcode-parser-container" class="simulator-card">
+                    <h2 class="text-xl font-semibold text-white mb-4">G-Code Parser</h2>
+                    <p class="text-gray-400 text-sm mb-4">Upload an OrcaSlicer `.gcode` file to automatically populate
+                        parameters for the selected model.</p>
+                    <input type="file" id="gcodeFile" accept=".gcode" class="block w-full text-sm text-gray-400
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-full file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-blue-600 file:text-white
+                        hover:file:bg-blue-700 file:cursor-pointer
+                    " />
+                    <button id="parseGcodeBtn"
+                        class="mt-4 w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg">
+                        Parse G-Code
+                    </button>
+                </div>
+
+                <!-- Parameters Card -->
+                <div class="simulator-card">
+                    <h2 class="text-xl font-semibold text-white mb-4">Process Parameters</h2>
+
+                    <!-- Kaggle Model Parameters -->
+                    <div id="kaggle-params" class="model-params space-y-4">
+                        <!-- ... Kaggle sliders ... -->
+                        <div class="relative group">
+                            <label for="layer_height" class="slider-label"><span>Layer Height (mm)</span><span
+                                    id="layer_height_val" class="slider-value">0.1</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Thickness of each individual printed layer. Smaller is higher quality but slower.
+                            </span>
+                            <input type="range" id="layer_height" min="0.02" max="0.3" step="0.01" value="0.1"
+                                class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="wall_thickness" class="slider-label"><span>Wall Thickness (layers)</span><span
+                                    id="wall_thickness_val" class="slider-value">4</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Number of outer shells (perimeters). More walls = stronger part.
+                            </span>
+                            <input type="range" id="wall_thickness" min="1" max="10" step="1" value="4" class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="infill_density" class="slider-label"><span>Infill Density (%)</span><span
+                                    id="infill_density_val" class="slider-value">50</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Percentage of material used for the internal support structure. Higher = stronger and
+                                heavier.
+                            </span>
+                            <input type="range" id="infill_density" min="10" max="100" step="1" value="50"
+                                class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="nozzle_temperature" class="slider-label"><span>Nozzle Temp (°C)</span><span
+                                    id="nozzle_temperature_val" class="slider-value">220</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Temperature of the extruder. Critical for layer adhesion and strength.
+                            </span>
+                            <input type="range" id="nozzle_temperature" min="200" max="250" step="1" value="220"
+                                class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="bed_temperature" class="slider-label"><span>Bed Temp (°C)</span><span
+                                    id="bed_temperature_val" class="slider-value">60</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Temperature of the print surface. Prevents warping and helps with first-layer adhesion.
+                            </span>
+                            <input type="range" id="bed_temperature" min="50" max="100" step="1" value="60"
+                                class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="print_speed" class="slider-label"><span>Print Speed (mm/s)</span><span
+                                    id="print_speed_val" class="slider-value">60</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Speed of the print head (mm/s). Slower is generally stronger and more accurate.
+                            </span>
+                            <input type="range" id="print_speed" min="40" max="120" step="1" value="60" class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="fan_speed" class="slider-label"><span>Fan Speed (%)</span><span
+                                    id="fan_speed_val" class="slider-value">50</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Cooling fan speed. Higher speed cools the plastic faster, improving overhangs but can
+                                reduce layer bonding.
+                            </span>
+                            <input type="range" id="fan_speed" min="0" max="100" step="1" value="50" class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="infill_pattern" class="block text-sm font-medium text-gray-300 mb-2">Infill
+                                Pattern</label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Geometric shape of the internal infill (e.g., Grid, Honeycomb).
+                            </span>
+                            <select id="infill_pattern"
+                                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
+                                <option value="grid">Grid</option>
+                                <option value="honeycomb">Honeycomb</option>
+                            </select>
+                        </div>
+                        <div class="relative group">
+                            <label for="material" class="block text-sm font-medium text-gray-300 mb-2">Material</label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Type of filament (e.g., PLA, ABS). This model only supports PLA and ABS.
+                            </span>
+                            <select id="material"
+                                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
+                                <option value="abs">ABS</option>
+                                <option value="pla">PLA</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- C3 Model Parameters -->
+                    <div id="c3-params" class="model-params space-y-4 hidden">
+                        <!-- ... C3 sliders ... -->
+                        <div class="relative group">
+                            <label for="c3_Temperature" class="slider-label"><span>Nozzle Temp (°C)</span><span
+                                    id="c3_Temperature_val" class="slider-value">205</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Temperature of the extruder. Critical for layer adhesion and strength.
+                            </span>
+                            <input type="range" id="c3_Temperature" min="190" max="220" step="1" value="205"
+                                class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="c3_Speed" class="slider-label"><span>Print Speed (mm/s)</span><span
+                                    id="c3_Speed_val" class="slider-value">70</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Speed of the print head (mm/s). Slower is generally stronger.
+                            </span>
+                            <input type="range" id="c3_Speed" min="40" max="100" step="1" value="70" class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="c3_Angle" class="slider-label"><span>Raster Angle (°)</span><span
+                                    id="c3_Angle_val" class="slider-value">45</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Raster angle (e.g., 0°, 45°, 90°). The direction lines are printed relative to the
+                                part's X/Y axes.
+                            </span>
+                            <input type="range" id="c3_Angle" min="0" max="90" step="15" value="45" class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="c3_Height" class="slider-label"><span>Layer Height (mm)</span><span
+                                    id="c3_Height_val" class="slider-value">0.15</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Thickness of each individual printed layer. Smaller is higher quality but slower.
+                            </span>
+                            <input type="range" id="c3_Height" min="0.1" max="0.2" step="0.01" value="0.15"
+                                class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="c3_Fill" class="slider-label"><span>Infill Density (%)</span><span
+                                    id="c3_Fill_val" class="slider-value">85</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Percentage of material used for the internal support structure. Higher = stronger.
+                            </span>
+                            <input type="range" id="c3_Fill" min="70" max="100" step="1" value="85" class="w-full">
+                        </div>
+                    </div>
+
+                    <!-- FEA Model Parameters -->
+                    <div id="fea-params" class="model-params space-y-4 hidden">
+                        <h3 class="text-lg font-semibold text-blue-300">Filament Datasheet Properties</h3>
+                        <div class="relative group">
+                            <label for="fea_Material_Bonding_Perfection" class="slider-label"><span>Bonding
+                                    Perfection</span><span id="fea_Material_Bonding_Perfection_val"
+                                    class="slider-value">0.5</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                A factor (0.1-1.0) representing how well layers bond. 1.0 is a perfect bond (like
+                                injection molding).
+                            </span>
+                            <input type="range" id="fea_Material_Bonding_Perfection" min="0.1" max="1.0" step="0.01"
+                                value="0.5" class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="fea_Material_Young_s_Modulus_GPa" class="slider-label"><span>Young's Modulus
+                                    (GPa)</span><span id="fea_Material_Young_s_Modulus_GPa_val"
+                                    class="slider-value">2.5</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Material stiffness. Find this value on your filament's Technical Data Sheet (TDS).
+                            </span>
+                            <input type="range" id="fea_Material_Young_s_Modulus_GPa" min="1.0" max="5.0" step="0.1"
+                                value="2.5" class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="fea_Material_Tensile_Yield_Strenght_MPa" class="slider-label"><span>Tensile
+                                    Strength (MPa)</span><span id="fea_Material_Tensile_Yield_Strenght_MPa_val"
+                                    class="slider-value">50</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Maximum stress the *raw filament* can take. Find this on your filament's TDS.
+                            </span>
+                            <input type="range" id="fea_Material_Tensile_Yield_Strenght_MPa" min="20" max="80" step="1"
+                                value="50" class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="fea_Material_Poisson_s_Ratio" class="slider-label"><span>Poisson's
+                                    Ratio</span><span id="fea_Material_Poisson_s_Ratio_val"
+                                    class="slider-value">0.35</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Material's tendency to shrink/expand sideways when stretched/compressed. Find this on
+                                your filament's TDS.
+                            </span>
+                            <input type="range" id="fea_Material_Poisson_s_Ratio" min="0.1" max="0.5" step="0.01"
+                                value="0.35" class="w-full">
+                        </div>
+
+                        <h3 class="text-lg font-semibold text-blue-300 mt-4">Slicer Settings</h3>
+                        <div class="relative group">
+                            <label for="fea_User_Infill_Density" class="slider-label"><span>Infill Density</span><span
+                                    id="fea_User_Infill_Density_val" class="slider-value">0.5</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Infill percentage (as a decimal, 0.1-1.0) for the part you are simulating.
+                            </span>
+                            <input type="range" id="fea_User_Infill_Density" min="0.1" max="1.0" step="0.01" value="0.5"
+                                class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="fea_User_Line_Thickenss_mm" class="slider-label"><span>Line Thickness
+                                    (mm)</span><span id="fea_User_Line_Thickenss_mm_val"
+                                    class="slider-value">0.4</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Width of a single extruded line (e.g., 0.4mm for a 0.4mm nozzle).
+                            </span>
+                            <input type="range" id="fea_User_Line_Thickenss_mm" min="0.2" max="0.8" step="0.01"
+                                value="0.4" class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="fea_User_Layer_Height_mm" class="slider-label"><span>Layer Height
+                                    (mm)</span><span id="fea_User_Layer_Height_mm_val"
+                                    class="slider-value">0.2</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Thickness of each individual printed layer for the part you are simulating.
+                            </span>
+                            <input type="range" id="fea_User_Layer_Height_mm" min="0.1" max="0.4" step="0.01"
+                                value="0.2" class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="fea_User_Infill_Pattern"
+                                class="block text-sm font-medium text-gray-300 mb-2">Infill Pattern</label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Geometric shape of the internal infill. This model supports Rectilinear and Concentric.
+                            </span>
+                            <select id="fea_User_Infill_Pattern"
+                                class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
+                                <option value="Rectilinear">Rectilinear</option>
+                                <option value="concentric">Concentric</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Fatigue Model Parameters -->
+                    <div id="fatigue-params" class="model-params space-y-4 hidden">
+                        <h3 class="text-lg font-semibold text-blue-300">Part Load</h3>
+                        <div class="relative group">
+                            <label for="fatigue_Stress_Level" class="slider-label"><span>Applied Stress Level
+                                    (MPa)</span><span id="fatigue_Stress_Level_val"
+                                    class="slider-value">10</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                The real-world cyclical load (in MegaPascals) you expect the part to endure. This is
+                                *not* a slicer setting. Estimate this based on your part's use case.
+                            </span>
+                            <input type="range" id="fatigue_Stress_Level" min="2.5" max="15" step="0.1" value="10"
+                                class="w-full">
+                        </div>
+                        <h3 class="text-lg font-semibold text-blue-300 mt-4">Slicer Settings</h3>
+                        <div class="relative group">
+                            <label for="fatigue_Nozzle_Diameter" class="slider-label"><span>Nozzle Diameter
+                                    (mm)</span><span id="fatigue_Nozzle_Diameter_val"
+                                    class="slider-value">0.4</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                The diameter of the nozzle used to print the part (e.g., 0.4mm, 0.6mm).
+                            </span>
+                            <input type="range" id="fatigue_Nozzle_Diameter" min="0.2" max="0.6" step="0.1" value="0.4"
+                                class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="fatigue_Print_Speed" class="slider-label"><span>Print Speed (mm/s)</span><span
+                                    id="fatigue_Print_Speed_val" class="slider-value">10</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Speed of the print head (mm/s). Slower is generally stronger and more durable.
+                            </span>
+                            <input type="range" id="fatigue_Print_Speed" min="5" max="15" step="1" value="10"
+                                class="w-full">
+                        </div>
+                        <div class="relative group">
+                            <label for="fatigue_Nozzle_Temperature" class="slider-label"><span>Nozzle Temp
+                                    (°C)</span><span id="fatigue_Nozzle_Temperature_val"
+                                    class="slider-value">210</span></label>
+                            <span
+                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Temperature of the extruder. Critical for layer adhesion and fatigue life.
+                            </span>
+                            <input type="range" id="fatigue_Nozzle_Temperature" min="180" max="240" step="1" value="210"
+                                class="w-full">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 2: Predicted Properties -->
+            <div class="lg:col-span-1 space-y-6">
+
+                <!-- Predicted Properties Card -->
+                <div class="simulator-card">
+                    <h2 class="text-xl font-semibold text-white mb-4">Predicted Properties</h2>
+                    <div id="spinner" class="hidden text-center text-gray-400">
+                        <svg class="animate-spin h-5 w-5 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg"
+                            fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        <p>Simulating...</p>
+                    </div>
+                    <div id="error-message"
+                        class="hidden text-center text-red-400 p-3 bg-red-900 bg-opacity-30 rounded-lg">
+                        <p class="font-bold">Simulation Failed</p>
+                        <p id="error-text" class="text-sm">Error details here.</p>
+                    </div>
+
+                    <!-- Kaggle Model Outputs -->
+                    <div id="kaggle-outputs" class="model-outputs space-y-3">
+                        <div class="output-card">
+                            <div>
+                                <div class="output-label">Tensile Strength</div>
+                                <div id="tensile_strength" class="output-value">...</div>
+                            </div>
+                            <div class="text-lg font-medium text-gray-400">MPa</div>
+                        </div>
+                        <div class="output-card">
+                            <div>
+                                <div class="output-label">Roughness</div>
+                                <div id="roughness" class="output-value">...</div>
+                            </div>
+                            <div class="text-lg font-medium text-gray-400">µm</div>
+                        </div>
+                        <div class="output-card">
+                            <div>
+                                <div class="output-label">Elongation</div>
+                                <div id="elongation" class="output-value">...</div>
+                            </div>
+                            <div class="text-lg font-medium text-gray-400">%</div>
+                        </div>
+                    </div>
+
+                    <!-- C3 Model Outputs -->
+                    <div id="c3-outputs" class="model-outputs space-y-3 hidden">
+                        <div class="output-card">
+                            <div>
+                                <div class="output-label">Tensile Strength</div>
+                                <div id="c3_tensile_strength" class="output-value">...</div>
+                            </div>
+                            <div class="text-lg font-medium text-gray-400">MPa</div>
+                        </div>
+                        <div class="output-card">
+                            <div>
+                                <div class="output-label">Elongation at Break</div>
+                                <div id="c3_elongation" class="output-value">...</div>
+                            </div>
+                            <div class="text-lg font-medium text-gray-400">%</div>
+                        </div>
+                    </div>
+
+                    <!-- FEA Model Outputs -->
+                    <div id="fea-outputs" class="model-outputs space-y-4 hidden">
+                        <div class="space-y-4">
+                            <div>
+                                <h3 class="text-lg font-semibold text-white mb-2">Upload Part Geometry</h3>
+                                <p class="text-gray-400 text-sm mb-4">Upload an STL file to visualize your part.</p>
+                                <input type="file" id="stlFile" accept=".stl" class="block w-full text-sm text-gray-400
+                                    file:mr-4 file:py-2 file:px-4
+                                    file:rounded-full file:border-0
+                                    file:text-sm file:font-semibold
+                                    file:bg-blue-600 file:text-white
+                                    hover:file:bg-blue-700 file:cursor-pointer
+                                " />
+                            </div>
+                            <div id="stlCanvas"></div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-2">Predicted Material Card</h3>
+                            <p class="text-gray-400 text-sm mb-2">These anisotropic properties can be exported to
+                                professional FEA software.</p>
+                            <div class="fea-table-container">
+                                <table class="w-full text-left text-sm text-gray-300">
+                                    <thead class="text-xs text-gray-100 uppercase">
+                                        <tr>
+                                            <th scope="col" class="py-3 px-4">Property</th>
+                                            <th scope="col" class="py-3 px-4">Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="fea-results-table">
+                                        <!-- Rows will be injected by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fatigue Model Outputs -->
+                    <div id="fatigue-outputs" class="model-outputs space-y-3 hidden">
+                        <div class="output-card">
+                            <div>
+                                <div class="output-label">Predicted Fatigue Lifetime</div>
+                                <div id="fatigue_lifetime" class="output-value">...</div>
+                            </div>
+                            <div class="text-lg font-medium text-gray-400">Cycles</div>
+                        </div>
+                        <div class="text-gray-400 text-sm p-2">
+                            This is an estimate of how many times the part can withstand the specified stress level
+                            before failure.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 3: Recommendations -->
+            <div class="lg:col-span-1 space-y-6">
+                <div class="simulator-card">
+                    <h2 class="text-xl font-semibold text-white mb-4">Optimization Recommendations</h2>
+
+                    <!-- Kaggle Recommendations -->
+                    <div id="kaggle-recs" class="model-recs space-y-4">
+                        <div>
+                            <h3 class="text-lg font-semibold text-green-400">To Maximize Quality (Strength & Finish):
+                            </h3>
+                            <ul id="kaggle-rec-quality" class="list-disc list-inside text-gray-300 text-sm space-y-1">
+                                <!-- JS will populate this -->
+                            </ul>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-yellow-400">To Maximize Speed & Cost-Effectiveness:
+                            </h3>
+                            <ul id="kaggle-rec-speed" class="list-disc list-inside text-gray-300 text-sm space-y-1">
+                                <!-- JS will populate this -->
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- C3 Recommendations -->
+                    <div id="c3-recs" class="model-recs space-y-4 hidden">
+                        <div>
+                            <h3 class="text-lg font-semibold text-green-400">To Maximize Tensile Strength:</h3>
+                            <ul id="c3-rec-strength" class="list-disc list-inside text-gray-300 text-sm space-y-1">
+                                <!-- JS will populate this -->
+                            </ul>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-blue-400">To Maximize Elongation (Ductility):</h3>
+                            <ul id="c3-rec-elongation" class="list-disc list-inside text-gray-300 text-sm space-y-1">
+                                <!-- JS will populate this -->
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- FEA Recommendations -->
+                    <div id="fea-recs" class="model-recs space-y-4 hidden">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-300">FEA Model Notes</h3>
+                            <p class="text-gray-400 text-sm">
+                                This model predicts the anisotropic material properties based on your filament's
+                                datasheet values and slicer settings.
+                            </p>
+                            <ul class="list-disc list-inside text-gray-300 text-sm space-y-1 mt-2">
+                                <li>The predicted values are for the **part as printed**, not the raw filament.</li>
+                                <li>**Higher 'Bonding Perfection'** (better layer adhesion) dramatically increases
+                                    vertical strength.</li>
+                                <li>The **Infill Pattern** (Rectilinear vs. Concentric) has a major impact on how the
+                                    part behaves under load from different directions.</li>
+                                <li>Use these properties in FEA software to simulate real-world performance of your
+                                    specific part geometry.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Fatigue Recommendations -->
+                    <div id="fatigue-recs" class="model-recs space-y-4 hidden">
+                        <div>
+                            <h3 class="text-lg font-semibold text-green-400">To Maximize Fatigue Life (Durability):</h3>
+                            <ul id="fatigue-rec-life" class="list-disc list-inside text-gray-300 text-sm space-y-1">
+                                <!-- JS will populate this -->
+                            </ul>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-red-400">To Reduce Fatigue Life (Warning):</h3>
+                            <ul id="fatigue-rec-warning" class="list-disc list-inside text-gray-300 text-sm space-y-1">
+                                <!-- JS will populate this -->
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div> <!-- End of main content grid -->
+
+        <!-- New References Footer -->
+        <footer class="mt-8 pt-8 border-t border-gray-700">
+            <div class="simulator-card">
+                <h2 class="text-2xl font-semibold text-white mb-6">Data Sources & References</h2>
+                <p class="text-gray-400 mb-4">This simulator is built on machine learning models trained using data from
+                    the following academic papers and datasets. The recommendations are also derived from the findings
+                    within this research.</p>
+                <ol class="list-decimal list-inside space-y-4 text-gray-300 text-sm">
+                    <li>
+                        <strong>Kaggle Model:</strong> Fumetto, A. (2022). <em>3D Printer Dataset</em>. Kaggle.
+                        Retrieved from <a href="https://www.kaggle.com/datasets/afumetto/3dprinter" target="_blank"
+                            rel="noopener noreferrer"
+                            class="text-blue-400 hover:underline">kaggle.com/datasets/afumetto/3dprinter</a>
+                        <br>
+                        <span class="text-gray-400 text-xs">(Source for <code>data.csv</code>)</span>
+                    </li>
+                    <li>
+                        <strong>C3 Model:</strong> Wang, L., Jiang, J., Dong, Y., Ghita, O., Zhu, Y., & Sucala, V. I.
+                        (2024). Machine learning enabled 3D printing parameter settings for desired mechanical
+                        properties. <em>Virtual and Physical Prototyping, 19</em>(1).
+                        <br>
+                        <span class="text-gray-400 text-xs">(Source for <code>C3-RAW DATA.csv</code>)</span>
+                    </li>
+                    <li>
+                        <strong>FEA Model:</strong> Lee, J., & Tucker, C. (2025). Data-Driven 3D-Printed Material Data
+                        Prediction From Benchmark Specimens. <em>ASME Journal of Computing and Information Science in
+                            Engineering, 25</em>(11).
+                        <br>
+                        <span class="text-gray-400 text-xs">(Source for
+                            <code>3D_Printing_Data.xlsx - Sheet1.csv</code>)</span>
+                    </li>
+                    <li>
+                        <strong>Fatigue Model:</strong> Azadi, M., & Dadashi, A. (2022). Experimental fatigue dataset
+                        for additive-manufactured 3D-printed Polylactic acid biomaterials under fully-reversed
+                        rotating-bending loadings. <em>Data in Brief, 41</em>.
+                        <br>
+                        <span class="text-gray-400 text-xs">(Source for
+                            <code>1-s2.0-S2352340922000580-mmc1.xlsx - Data.csv</code>)</span>
+                    </li>
+                    <li>
+                        <strong>General ML Methodology:</strong> Panico, A., Corvi, A., Collini, L., & Sciancalepore, C.
+                        (2025). Multi objective optimization of FDM 3D printing parameters set via design of experiments
+                        and machine learning algorithms. <em>Scientific Reports, 15</em>.
+                    </li>
+                    <li>
+                        <strong>General ML Methodology:</strong> Jatti, V.S., Sapre, M.S., Jatti, A.V., Khedkar, N.K., &
+                        Jatti, V.S. (2022). Mechanical Properties of 3D-Printed Components Using Fused Deposition
+                        Modeling. <em>Applied System Innovation, 5</em>(112).
+                    </li>
+                    <li>
+                        <strong>Digital Twin Concept:</strong> Rojek, I., Marciniak, T., & Mikołajewski, D. (2024).
+                        Digital Twins in 3D Printing Processes Using Artificial Intelligence. <em>Electronics,
+                            13</em>(3550).
+                    </li>
+                </ol>
+            </div>
+        </footer>
+
+    </div>
+
+    <script typeIS="module">
+        // === 3D Viewer (three.js) ===
+        let scene, camera, renderer, controls, mesh;
+
+        function init3DViewer() {
+            const canvas = document.getElementById('stlCanvas');
+
+            // 1. Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1f2937); // gray-800
+
+            // 2. Camera
+            camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+            camera.position.z = 100;
+
+            // 3. Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+            canvas.innerHTML = ''; // Clear canvas
+            canvas.appendChild(renderer.domElement);
+
+            // 4. Lights
+            const ambientLight = new THREE.AmbientLight(0x404040, 2); // soft white light
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(1, 1, 1).normalize();
+            scene.add(directionalLight);
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight2.position.set(-1, -1, -1).normalize();
+            scene.add(directionalLight2);
+
+            // 5. Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.25;
+            controls.enableZoom = true;
+
+            // 6. Animation Loop
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            // 7. Resize Handler
+            window.addEventListener('resize', () => {
+                if (canvas.offsetParent === null) return; // Only resize if visible
+                const width = canvas.clientWidth;
+                const height = canvas.clientHeight;
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(width, height);
+            }, false);
+        }
+
+        function loadSTL(file) {
+            const loader = new THREE.STLLoader();
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                try {
+                    const geometry = loader.parse(event.target.result);
+
+                    if (mesh) {
+                        scene.remove(mesh); // Remove old mesh
+                    }
+
+                    // Create material
+                    const material = new THREE.MeshStandardMaterial({
+                        color: 0x3b82f6, // blue-500
+                        metalness: 0.1,
+                        roughness: 0.5,
+                    });
+
+                    // Create mesh
+                    mesh = new THREE.Mesh(geometry, material);
+
+                    // Center the geometry
+                    geometry.computeBoundingBox();
+                    const center = geometry.boundingBox.getCenter(new THREE.Vector3());
+                    mesh.position.sub(center);
+
+                    // Add to scene
+                    scene.add(mesh);
+
+                    // Zoom to fit
+                    const size = geometry.boundingBox.getSize(new THREE.Vector3()).length();
+                    camera.position.z = size;
+                    controls.update();
+
+                } catch (e) {
+                    console.error("Error parsing STL:", e);
+                    showError("Error: Could not parse the STL file. It may be corrupt or in the wrong format.");
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        // === API & Simulation Logic ===
+        const API_BASE_URL = "http://127.0.0.1:8000";
+        const spinner = document.getElementById('spinner');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+
+        // --- Input Getters ---
+        function getKaggleInputs() {
+            return {
+                layer_height: parseFloat(document.getElementById('layer_height').value),
+                wall_thickness: parseInt(document.getElementById('wall_thickness').value),
+                infill_density: parseInt(document.getElementById('infill_density').value),
+                infill_pattern: document.getElementById('infill_pattern').value,
+                nozzle_temperature: parseInt(document.getElementById('nozzle_temperature').value),
+                bed_temperature: parseInt(document.getElementById('bed_temperature').value),
+                print_speed: parseInt(document.getElementById('print_speed').value),
+                material: document.getElementById('material').value,
+                fan_speed: parseInt(document.getElementById('fan_speed').value),
+            };
+        }
+
+        function getC3Inputs() {
+            return {
+                Temperature: parseFloat(document.getElementById('c3_Temperature').value),
+                Speed: parseFloat(document.getElementById('c3_Speed').value),
+                Angle: parseFloat(document.getElementById('c3_Angle').value),
+                Height: parseFloat(document.getElementById('c3_Height').value),
+                Fill: parseFloat(document.getElementById('c3_Fill').value),
+            };
+        }
+
+        function getFEAInputs() {
+            return {
+                Material_Bonding_Perfection: parseFloat(document.getElementById('fea_Material_Bonding_Perfection').value),
+                Material_Young_s_Modulus_GPa: parseFloat(document.getElementById('fea_Material_Young_s_Modulus_GPa').value),
+                Material_Tensile_Yield_Strenght_MPa: parseFloat(document.getElementById('fea_Material_Tensile_Yield_Strenght_MPa').value),
+                Material_Poisson_s_Ratio: parseFloat(document.getElementById('fea_Material_Poisson_s_Ratio').value),
+                User_Infill_Pattern: document.getElementById('fea_User_Infill_Pattern').value,
+                User_Infill_Density: parseFloat(document.getElementById('fea_User_Infill_Density').value),
+                User_Line_Thickenss_mm: parseFloat(document.getElementById('fea_User_Line_Thickenss_mm').value),
+                User_Layer_Height_mm: parseFloat(document.getElementById('fea_User_Layer_Height_mm').value),
+            };
+        }
+
+        function getFatigueInputs() {
+            return {
+                Nozzle_Diameter: parseFloat(document.getElementById('fatigue_Nozzle_Diameter').value),
+                Print_Speed: parseFloat(document.getElementById('fatigue_Print_Speed').value),
+                Nozzle_Temperature: parseFloat(document.getElementById('fatigue_Nozzle_Temperature').value),
+                Stress_Level: parseFloat(document.getElementById('fatigue_Stress_Level').value),
+            };
+        }
+
+        // --- UI Updaters ---
+        function updateKaggleUI(data) {
+            document.getElementById('tensile_strength').textContent = data.tensile_strength.toFixed(2);
+            document.getElementById('roughness').textContent = data.roughness.toFixed(2);
+            document.getElementById('elongation').textContent = data.elongation.toFixed(2);
+        }
+
+        function updateC3UI(data) {
+            document.getElementById('c3_tensile_strength').textContent = data.Tensile_Strength_MPa.toFixed(2);
+            document.getElementById('c3_elongation').textContent = data.Elongation_at_Break_percent.toFixed(2);
+        }
+
+        function updateFEAUI(data) {
+            const tableBody = document.getElementById('fea-results-table');
+            tableBody.innerHTML = ''; // Clear old results
+            for (const [key, value] of Object.entries(data)) {
+                const row = `
+                    <tr class="bg-gray-800 border-b border-gray-700">
+                        <td class="py-2 px-4 font-medium">${key.replace(/_/g, ' ')}</td>
+                        <td class="py-2 px-4 text-blue-300 font-mono">${parseFloat(value).toFixed(4)}</td>
+                    </tr>
+                `;
+                tableBody.innerHTML += row;
+            }
+        }
+
+        function updateFatigueUI(data) {
+            // Format with commas
+            document.getElementById('fatigue_lifetime').textContent = Math.round(data.Fatigue_Lifetime).toLocaleString();
+        }
+
+        // --- Recommendation Engines ---
+        function updateKaggleRecs(inputs) {
+            const recQuality = [];
+            const recSpeed = [];
+
+            // Quality
+            if (inputs.layer_height <= 0.1) recQuality.push("Low layer height is good for quality.");
+            else recQuality.push("Consider lowering layer height (< 0.1mm) for better finish and strength.");
+
+            if (inputs.infill_density > 80) recQuality.push("High infill density is great for strength.");
+            else recQuality.push("Increase infill density (> 80%) for maximum strength.");
+
+            if (inputs.print_speed < 60) recQuality.push("Low print speed improves layer adhesion.");
+            else recQuality.push("Reduce print speed (< 60mm/s) to increase strength.");
+
+            if (inputs.material === 'abs' && inputs.nozzle_temperature < 230) recQuality.push("Increase ABS temp (> 230°C) for better layer bonding.");
+            if (inputs.material === 'pla' && inputs.nozzle_temperature < 210) recQuality.push("Increase PLA temp (> 210°C) for better layer bonding.");
+
+            // Speed
+            if (inputs.layer_height > 0.2) recSpeed.push("High layer height is great for speed.");
+            else recSpeed.push("Increase layer height (> 0.2mm) to reduce print time.");
+
+            if (inputs.infill_density < 30) recSpeed.push("Low infill density saves time and material.");
+            else recSpeed.push("Lower infill density (< 30%) for faster, cheaper prints (if strength is not critical).");
+
+            if (inputs.print_speed > 90) recSpeed.push("High print speed is fast.");
+            else recSpeed.push("Increase print speed (> 90mm/s) to reduce print time.");
+
+            document.getElementById('kaggle-rec-quality').innerHTML = recQuality.map(rec => `<li>${rec}</li>`).join('');
+            document.getElementById('kaggle-rec-speed').innerHTML = recSpeed.map(rec => `<li>${rec}</li>`).join('');
+        }
+
+        function updateC3Recs(inputs) {
+            const recStrength = [];
+            const recElongation = [];
+
+            // Strength
+            if (inputs.Temperature > 210) recStrength.push("High nozzle temp (> 210°C) is good for strength.");
+            else recStrength.push("Increase nozzle temp (> 210°C) for better layer bonding.");
+
+            if (inputs.Fill > 90) recStrength.push("High infill density (> 90%) maximizes strength.");
+            else recStrength.push("Increase infill density for higher strength.");
+
+            if (inputs.Height <= 0.1) recStrength.push("Low layer height (0.1mm) improves strength.");
+            else recStrength.push("Decrease layer height to 0.1mm for better strength.");
+
+            // Elongation
+            if (inputs.Temperature < 200) recElongation.push("Lower temps (< 200°C) can increase ductility.");
+            else recElongation.push("Try a moderate temperature (~200-210°C).");
+
+            if (inputs.Angle === 45) recElongation.push("A 45° raster angle provides a good balance of properties.");
+            else recElongation.push("Consider a 45° raster angle for balanced ductility.");
+
+            document.getElementById('c3-rec-strength').innerHTML = recStrength.map(rec => `<li>${rec}</li>`).join('');
+            document.getElementById('c3-rec-elongation').innerHTML = recElongation.map(rec => `<li>${rec}</li>`).join('');
+        }
+
+        function updateFatigueRecs(inputs) {
+            const recLife = [];
+            const recWarning = [];
+
+            // Life
+            if (inputs.Nozzle_Temperature > 220) recLife.push("High nozzle temp (> 220°C) improves layer bonding, increasing fatigue life.");
+            else recLife.push("Increase nozzle temp (> 220°C) for significantly better durability.");
+
+            if (inputs.Print_Speed < 8) recLife.push("Low print speed (< 8 mm/s) allows better layer fusion.");
+            else recLife.push("Reduce print speed (< 8 mm/s) to maximize fatigue life.");
+
+            if (inputs.Nozzle_Diameter > 0.4) recLife.push("A larger nozzle diameter (0.6mm) can create stronger bonds.");
+            else recLife.push("Consider a larger nozzle (0.6mm) if durability is critical.");
+
+            // Warning
+            if (inputs.Stress_Level > 10) recWarning.push("High stress levels drastically reduce part lifetime.");
+            else recWarning.push("Lowering the applied stress is the most effective way to increase life.");
+
+            if (inputs.Nozzle_Temperature < 200) recWarning.push("Low nozzle temp (< 200°C) creates weak bonds that fail quickly under fatigue.");
+            if (inputs.Print_Speed > 12) recWarning.push("High print speed (> 12 mm/s) can lead to poor layer adhesion.");
+
+            document.getElementById('fatigue-rec-life').innerHTML = recLife.map(rec => `<li>${rec}</li>`).join('');
+            document.getElementById('fatigue-rec-warning').innerHTML = recWarning.map(rec => `<li>${rec}</li>`).join('');
+        }
+
+        // --- State Management ---
+        function showSpinner() {
+            spinner.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+        }
+
+        function hideSpinner() {
+            spinner.classList.add('hidden');
+        }
+
+        function showError(message) {
+            hideSpinner();
+            errorText.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorMessage.classList.add('hidden');
+        }
+
+        // --- Main Simulation Functions ---
+
+        // Use a debounce function to prevent spamming the API on every slider move
+        function debounce(func, delay) {
+            let timeout;
+            return function (...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
+
+        async function runKaggleSimulation() {
+            showSpinner();
+            const inputs = getKaggleInputs();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/predict/kaggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(inputs)
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                hideSpinner();
+                hideError();
+                updateKaggleUI(data);
+                updateKaggleRecs(inputs);
+
+            } catch (error) {
+                console.error("Simulation failed:", error);
+                showError(`Error: ${error.message}. Is the server running?`);
+            }
+        }
+
+        async function runC3Simulation() {
+            showSpinner();
+            const inputs = getC3Inputs();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/predict/c3`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(inputs)
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                hideSpinner();
+                hideError();
+                updateC3UI(data);
+                updateC3Recs(inputs);
+
+            } catch (error) {
+                console.error("Simulation failed:", error);
+                showError(`Error: ${error.message}. Is server running?`);
+            }
+        }
+
+        async function runFEASimulation() {
+            showSpinner();
+            const inputs = getFEAInputs();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/predict/fea`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(inputs)
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                hideSpinner();
+                hideError();
+                updateFEAUI(data);
+                // No recs for FEA, the table is the output
+
+            } catch (error) {
+                console.error("Simulation failed:", error);
+                showError(`Error: ${error.message}. Is server running?`);
+            }
+        }
+
+        async function runFatigueSimulation() {
+            showSpinner();
+            const inputs = getFatigueInputs();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/predict/fatigue`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(inputs)
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                hideSpinner();
+                hideError();
+                updateFatigueUI(data);
+                updateFatigueRecs(inputs);
+
+            } catch (error) {
+                console.error("Simulation failed:", error);
+                showError(`Error: ${error.message}. Is server running?`);
+            }
+        }
+
+        // Debounced simulation runners
+        const debouncedKaggleSim = debounce(runKaggleSimulation, 300);
+        const debouncedC3Sim = debounce(runC3Simulation, 300);
+        const debouncedFEASim = debounce(runFEASimulation, 300);
+        const debouncedFatigueSim = debounce(runFatigueSimulation, 300);
+
+        // --- Model Switching Logic ---
+        const modelSelector = document.getElementById('modelSelector');
+        const paramContainers = document.querySelectorAll('.model-params');
+        const outputContainers = document.querySelectorAll('.model-outputs');
+        const recContainers = document.querySelectorAll('.model-recs');
+        const gcodeParserContainer = document.getElementById('gcode-parser-container');
+
+        function switchModel(selectedModel) {
+            // Hide all containers
+            [...paramContainers, ...outputContainers, ...recContainers].forEach(el => el.classList.add('hidden'));
+
+            // Hide GCode parser by default
+            gcodeParserContainer.classList.add('hidden');
+Route to the correct parser-- -
+                    if (selectedModel === 'kaggle') {
+                console.log("Parsing G-Code for Kaggle Model...");
+                const params = parseOrcaSlicerGcode_Kaggle(gcode);
+                console.log("Parsed Kaggle params:", params);
+                setKaggleInputs(params);
+                runKaggleSimulation(); // Re-run simulation
+            } else if (selectedModel === 'c3') {
+                console.log("Parsing G-Code for C3 Model...");
+                const params = parseOrcaSlicerGcode_C3(gcode);
+                console.log("Parsed C3 params:", params);
+                setC3Inputs(params);
+                runC3Simulation(); // Re-run simulation
+            }
+        } catch (error) {
+            console.error("G-Code parsing error:", error);
+            alert(`Failed to parse G-Code: ${error.message}`);
+        }
+            };
+
+        reader.readAsText(file);
+        });
+
+        function parseOrcaSlicerGcode_Kaggle(gcode) {
+            const params = {};
+            const lines = gcode.split('\n');
+
+            const patterns = {
+                layer_height: /; layer_height = ([\d.]+)/,
+                wall_thickness: /; wall_loops = (\d+)/,
+                infill_density: /; sparse_infill_density = ([\d.]+)%/,
+                infill_pattern: /; sparse_infill_pattern = (\w+)/,
+                nozzle_temperature: /; nozzle_temperature = (\d+)/,
+                bed_temperature: /; bed_temperature = (\d+)/,
+                print_speed: /; outer_wall_speed = ([\d.]+)/,
+                material: /; filament_type = (\w+)/,
+                fan_speed: /; fan_speed = (\d+)/,
+            };
+
+            for (const line of lines) {
+                if (!line.startsWith(';')) continue;
+                for (const [key, regex] of Object.entries(patterns)) {
+                    const match = line.match(regex);
+                    if (match && !params[key]) params[key] = match[1];
+                }
+            }
+
+            // Map material type
+            if (params.material) {
+                if (params.material.toLowerCase().includes('pla')) params.material = 'pla';
+                else if (params.material.toLowerCase().includes('abs')) params.material = 'abs';
+            }
+
+            if (Object.keys(params).length < 5) {
+                throw new Error("Could not find enough parameters for Kaggle model. Is this an OrcaSlicer G-Code file?");
+            }
+            return params;
+        }
+
+        // --- NEW FUNCTION for C3 Parsing ---
+        function parseOrcaSlicerGcode_C3(gcode) {
+            const params = {};
+            const lines = gcode.split('\n');
+
+            // Patterns for C3 model parameters
+            const patterns = {
+                Temperature: /; nozzle_temperature = (\d+)/,
+                Speed: /; outer_wall_speed = ([\d.]+)/, // Using outer wall as proxy
+                Angle: /; sparse_infill_angle = (\d+)/,
+                Height: /; layer_height = ([\d.]+)/,
+                Fill: /; sparse_infill_density = ([\d.]+)%/,
+            };
+
+            for (const line of lines) {
+                if (!line.startsWith(';')) continue;
+                for (const [key, regex] of Object.entries(patterns)) {
+                    const match = line.match(regex);
+                    if (match && !params[key]) params[key] = match[1];
+                }
+            }
+
+            if (Object.keys(params).length < 5) {
+                throw new Error("Could not find all 5 parameters for C3 model. Is this an OrcaSlicer G-Code file?");
+            }
+            return params;
+        }
+
+        // Helper to set slider and text value
+        const setSlider = (id, value) => {
+            const slider = document.getElementById(id);
+            if (slider) {
+                const min = parseFloat(slider.min);
+                const max = parseFloat(slider.max);
+                // Clamp value to slider's min/max range
+                const clampedValue = Math.max(min, Math.min(max, value));
+                slider.value = clampedValue;
+                const valEl = document.getElementById(`${id}_val`);
+                if (valEl) valEl.textContent = clampedValue;
+            } else {
+                console.warn(`Slider with id ${id} not found.`);
+            }
+        };
+
+        // Helper to set select value
+        const setSelect = (id, value) => {
+            const select = document.getElementById(id);
+            if (select) {
+                const option = Array.from(select.options).find(opt => value.toLowerCase().includes(opt.value.toLowerCase()));
+                if (option) select.value = option.value;
+                else console.warn(`Could not find matching option for ${id}: ${value}`);
+            }
+        };
+
+        function setKaggleInputs(params) {
+            if (params.layer_height) setSlider('layer_height', parseFloat(params.layer_height));
+            if (params.wall_thickness) setSlider('wall_thickness', parseInt(params.wall_thickness));
+            if (params.infill_density) setSlider('infill_density', parseFloat(params.infill_density));
+            if (params.nozzle_temperature) setSlider('nozzle_temperature', parseInt(params.nozzle_temperature));
+            if (params.bed_temperature) setSlider('bed_temperature', parseInt(params.bed_temperature));
+            if (params.print_speed) setSlider('print_speed', parseFloat(params.print_speed));
+            if (params.fan_speed) setSlider('fan_speed', parseInt(params.fan_speed));
+            if (params.infill_pattern) setSelect('infill_pattern', params.infill_pattern);
+            if (params.material) setSelect('material', params.material);
+        }
+
+        // --- NEW FUNCTION for C3 Setting ---
+        function setC3Inputs(params) {
+            if (params.Temperature) setSlider('c3_Temperature', parseFloat(params.Temperature));
+            if (params.Speed) setSlider('c3_Speed', parseFloat(params.Speed));
+            if (params.Angle) setSlider('c3_Angle', parseFloat(params.Angle));
+            if (params.Height) setSlider('c3_Height', parseFloat(params.Height));
+            if (params.Fill) setSlider('c3_Fill', parseFloat(params.Fill));
+        }
+
+        // --- Event Listeners ---
+
+        // Add listeners for all sliders and selects
+        const allInputs = document.querySelectorAll('input[type="range"], select');
+        allInputs.forEach(input => {
+            input.addEventListener('input', () => {
+                // Update text for sliders
+                if (input.type === 'range') {
+                    const valEl = document.getElementById(`${input.id}_val`);
+                    if (valEl) valEl.textContent = input.value;
+                }
+
+                // Trigger the correct simulation
+                const selectedModel = modelSelector.value;
+                if (selectedModel === 'kaggle') debouncedKaggleSim();
+                else if (selectedModel === 'c3') debouncedC3Sim();
+                else if (selectedModel === 'fea') debouncedFEASim();
+                else if (selectedModel === 'fatigue') debouncedFatigueSim();
+            });
+        });
+
+        // STL file loader
+        document.getElementById('stlFile').addEventListener('change', (event) => {
+            if (event.target.files.length > 0) {
+                loadSTL(event.target.files[0]);
+            }
+        });
+
+        // --- Initial Run ---
+        switchModel(modelSelector.value);
+
+    </script>
+</body>
+
+</html>
