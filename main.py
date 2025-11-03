@@ -41,9 +41,9 @@ materials_database = {}
 
 # --- Pydantic Models (Data Validation) ---
 
-# v3: New global inputs
+# v3: Changed part_volume_cm3 to part_mass_g
 class GlobalInputs(BaseModel):
-    part_volume_cm3: float = Field(..., gt=0, description="Volume of the part in cubic centimeters.")
+    part_mass_g: float = Field(..., gt=0, description="Mass of the part in grams.")
     filament_cost_kg: float = Field(..., gt=0, description="Cost of the filament spool per kilogram.")
     material_name: str = Field(..., description="Name of the material (e.g., 'PLA', 'ABS')")
 
@@ -105,29 +105,50 @@ class FatigueInput(GlobalInputs):
 class FatigueOutput(PredictionBase):
     Fatigue_Lifetime: float
 
-# --- v3: Cost & Time Calculation Logic ---
+# --- v3: Cost & Time Calculation Logic (CHANGED) ---
 
 def get_material_density(material_name: str) -> float:
     """Gets density from the loaded materials database, with a fallback."""
-    material_data = materials_database.get(material_name)
-    if material_data and 'density_g_cm3' in material_data:
-        return material_data['density_g_cm3']
+    # Find the material in the database, case-insensitive
+    for key, data in materials_database.items():
+        if key.lower() == material_name.lower():
+            if 'density_g_cm3' in data:
+                return data['density_g_cm3']
+            
     # Fallback density if not found
-    return 1.25 # Average density for PLA/ABS
+    if 'pla' in material_name.lower():
+        return 1.24
+    if 'abs' in material_name.lower():
+        return 1.04
+    if 'petg' in material_name.lower():
+        return 1.27
+    
+    return 1.25 # Average density
 
 def calculate_cost_time(
     inputs: GlobalInputs,
-    material_density: float,
     model_params: Dict[str, float]
 ) -> Dict[str, float]:
     """Calculates estimated cost and print time."""
     
     # Extract global inputs
-    part_volume_cm3 = inputs.part_volume_cm3
+    part_mass_g = inputs.part_mass_g
     filament_cost_kg = inputs.filament_cost_kg
     
+    # --- Cost Calculation (CHANGED) ---
+    # This is now much simpler
+    part_mass_kg = part_mass_g / 1000.0
+    estimated_cost_usd = part_mass_kg * filament_cost_kg
+
+    # --- Time Calculation (CHANGED) ---
+    # Need to get density to convert mass back to volume for time estimation
+    material_density = get_material_density(inputs.material_name)
+    if material_density == 0:
+        material_density = 1.25 # Prevent division by zero
+    
+    part_volume_cm3 = part_mass_g / material_density
+
     # Extract model-specific parameters
-    # Use defaults if a model doesn't provide the param (e.g., FEA has no print speed)
     infill_percent = model_params.get('infill', 80.0) # Infill as 0-100
     layer_height_mm = model_params.get('layer_height', 0.2)
     print_speed_mm_s = model_params.get('speed', 60.0)
@@ -136,26 +157,13 @@ def calculate_cost_time(
     if infill_percent <= 1.0 and infill_percent > 0:
         infill_percent *= 100 # Convert 0.5 to 50
     
-    # --- Cost Calculation ---
-    # 1. Calculate part mass in grams
-    # (Volume * density) * (infill / 100) -> assumes infill is the main volume
-    part_mass_g = (part_volume_cm3 * material_density) * (infill_percent / 100.0)
-    # 2. Convert mass to kg
-    part_mass_kg = part_mass_g / 1000.0
-    # 3. Calculate cost
-    estimated_cost_usd = part_mass_kg * filament_cost_kg
-
-    # --- Time Calculation (Simple Model) ---
     # This is a very rough estimate.
     # (Volume to extrude) / (Flow rate)
-    # Volume = part_volume * (infill / 100)
-    # Flow rate (mm^3/s) = layer_height * extrusion_width * print_speed
-    # We'll assume extrusion_width = nozzle_diameter (~0.4mm)
     extrusion_width_mm = 0.4 
     volume_to_extrude_mm3 = part_volume_cm3 * (infill_percent / 100.0) * 1000.0 # cm3 to mm3
     
     # Prevent division by zero if speed or layer height is 0
-    if print_speed_mm_s == 0 or layer_height_mm == 0:
+    if print_speed_mm_s <= 0 or layer_height_mm <= 0:
         estimated_print_time_min = 0.0
     else:
         flow_rate_mm3_s = layer_height_mm * extrusion_width_mm * print_speed_mm_s
@@ -235,16 +243,15 @@ async def predict_kaggle(inputs: KaggleInput):
     
     try:
         # 1. Get cost/time info
-        material_density = get_material_density(inputs.material_name)
         param_map = {
             'infill': inputs.infill_density,
             'layer_height': inputs.layer_height,
             'speed': inputs.print_speed
         }
-        cost_time_results = calculate_cost_time(inputs, material_density, param_map)
+        cost_time_results = calculate_cost_time(inputs, param_map)
 
         # 2. Get model prediction
-        features = pd.DataFrame([inputs.dict(exclude={'part_volume_cm3', 'filament_cost_kg', 'material_name'})])
+        features = pd.DataFrame([inputs.dict(exclude={'part_mass_g', 'filament_cost_kg', 'material_name'})])
         prediction = model_kaggle.predict(features)[0]
         
         # 3. Combine and return
@@ -265,16 +272,15 @@ async def predict_c3(inputs: C3Input):
         
     try:
         # 1. Get cost/time info
-        material_density = get_material_density(inputs.material_name)
         param_map = {
             'infill': inputs.Fill,
             'layer_height': inputs.Height,
             'speed': inputs.Speed
         }
-        cost_time_results = calculate_cost_time(inputs, material_density, param_map)
+        cost_time_results = calculate_cost_time(inputs, param_map)
 
         # 2. Get model prediction
-        features = pd.DataFrame([inputs.dict(exclude={'part_volume_cm3', 'filament_cost_kg', 'material_name'})])
+        features = pd.DataFrame([inputs.dict(exclude={'part_mass_g', 'filament_cost_kg', 'material_name'})])
         prediction = model_c3.predict(features)[0]
         
         # 3. Combine and return
@@ -294,19 +300,18 @@ async def predict_fea(inputs: FEAInput):
         
     try:
         # 1. Get cost/time info
-        material_density = get_material_density(inputs.material_name)
         param_map = {
             'infill': inputs.User_Infill_Density * 100.0, # Convert 0.1-1.0 to 10-100
             'layer_height': inputs.User_Layer_Height_mm,
             'speed': 60.0 # FEA model doesn't use print speed, so use a default for time
         }
-        cost_time_results = calculate_cost_time(inputs, material_density, param_map)
+        cost_time_results = calculate_cost_time(inputs, param_map)
 
         # 2. Get model prediction
-        features_dict = inputs.dict(exclude={'part_volume_cm3', 'filament_cost_kg', 'material_name'})
+        features_dict = inputs.dict(exclude={'part_mass_g', 'filament_cost_kg', 'material_name'})
         
         # Ensure correct feature names match training
-        features_dict['Material_Youngs_Modulus_GPa'] = features_dict.pop('Material_Young_s_Modulus_GPa')
+        features_dict['Material_Youngs_Modulus_GPa'] = features_dict.pop('Material_Youngs_Modulus_GPa')
         features_dict['Material_Tensile_Yield_Strenght_MPa'] = features_dict.pop('Material_Tensile_Yield_Strenght_MPa')
         features_dict['Material_Poissons_Ratio'] = features_dict.pop('Material_Poissons_Ratio')
         
@@ -333,17 +338,16 @@ async def predict_fatigue(inputs: FatigueInput):
         
     try:
         # 1. Get cost/time info
-        material_density = get_material_density(inputs.material_name)
         param_map = {
             # Fatigue model doesn't use infill or layer height, use defaults
             'infill': 80.0, 
             'layer_height': 0.2,
             'speed': inputs.Print_Speed
         }
-        cost_time_results = calculate_cost_time(inputs, material_density, param_map)
+        cost_time_results = calculate_cost_time(inputs, param_map)
 
         # 2. Get model prediction
-        features = pd.DataFrame([inputs.dict(exclude={'part_volume_cm3', 'filament_cost_kg', 'material_name'})])
+        features = pd.DataFrame([inputs.dict(exclude={'part_mass_g', 'filament_cost_kg', 'material_name'})])
         prediction = model_fatigue.predict(features)[0]
         
         # 3. Combine and return
