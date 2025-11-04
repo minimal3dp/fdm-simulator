@@ -28,11 +28,12 @@ MODEL_FEA_PATH = os.path.join(MODELS_DIR, "model_fea.joblib")
 MODEL_FATIGUE_PATH = os.path.join(MODELS_DIR, "model_fatigue.joblib")
 MODEL_ACCURACY_PATH = os.path.join(MODELS_DIR, "model_accuracy.joblib")
 MODEL_WARPAGE_PATH = os.path.join(MODELS_DIR, "model_warpage.joblib")
-MODEL_HARDNESS_PATH = os.path.join(MODELS_DIR, "model_hardness.joblib") # v7: New Model
+MODEL_HARDNESS_PATH = os.path.join(MODELS_DIR, "model_hardness.joblib")
+MODEL_MULTIMATERIAL_PATH = os.path.join(MODELS_DIR, "model_multimaterial.joblib") # v8: New Model
 FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
 
 # --- FastAPI App Initialization ---
-app = FastAPI(title="FDM 3D Print Property Simulator API (v7)")
+app = FastAPI(title="FDM 3D Print Property Simulator API (v8)")
 
 # Configure CORS
 app.add_middleware(
@@ -50,7 +51,8 @@ model_fea = None
 model_fatigue = None
 model_accuracy = None
 model_warpage = None
-model_hardness = None # v7: New Model
+model_hardness = None
+model_multimaterial = None # v8: New Model
 fea_target_names = []
 materials_database = {}
 
@@ -152,6 +154,17 @@ class HardnessInput(GlobalInputs):
 class HardnessOutput(PredictionBase):
     Hardness_Shore_D: float
 
+# --- v8: Model 8: Multi-Material Bond Strength ---
+class MultiMaterialInput(GlobalInputs):
+    Material_A: str
+    Material_B: str
+    Layer_Height_mm: float
+    Extrusion_Temp_C: int
+    Infill_Density_percent: int
+
+class MultiMaterialOutput(PredictionBase):
+    Tensile_Strength_MPa: float
+
 # --- v4: Optimization Pydantic Models ---
 class OptimizationObjective(BaseModel):
     name: str # e.g., "tensile_strength", "estimated_cost_usd"
@@ -239,7 +252,7 @@ def calculate_cost_time(
 @app.on_event("startup")
 async def startup_event():
     """Load all models and data on server startup."""
-    global model_kaggle, model_c3, model_fea, model_fatigue, model_accuracy, model_warpage, model_hardness, fea_target_names, materials_database
+    global model_kaggle, model_c3, model_fea, model_fatigue, model_accuracy, model_warpage, model_hardness, model_multimaterial, fea_target_names, materials_database
     
     # Load Materials JSON
     try:
@@ -302,12 +315,19 @@ async def startup_event():
     except Exception as e:
         print(f"Warning: Model file not found at {MODEL_HARDNESS_PATH}. Endpoint for 'hardness' will be disabled. Error: {e}")
 
+    # v8: Load Model 8: Multi-Material
+    try:
+        model_multimaterial = joblib.load(MODEL_MULTIMATERIAL_PATH)
+        print(f"Successfully loaded model 'multimaterial' from {MODEL_MULTIMATERIAL_PATH}")
+    except Exception as e:
+        print(f"Warning: Model file not found at {MODEL_MULTIMATERIAL_PATH}. Endpoint for 'multimaterial' will be disabled. Error: {e}")
+
 
 # --- API Endpoints ---
 
 @app.get("/")
 def read_root():
-    return {"message": "FDM Property Simulator API (v7) is running."}
+    return {"message": "FDM Property Simulator API (v8) is running."}
 
 @app.get("/materials", response_model=Dict[str, dict])
 async def get_materials():
@@ -495,7 +515,7 @@ async def predict_warpage(inputs: WarpageInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
 
-# --- v7: Endpoint 7: Hardness (Prediction) ---
+# --- Endpoint 7: Hardness (Prediction) ---
 @app.post("/predict/hardness", response_model=HardnessOutput)
 async def predict_hardness(inputs: HardnessInput):
     if model_hardness is None:
@@ -517,6 +537,33 @@ async def predict_hardness(inputs: HardnessInput):
         # 3. Combine and return
         return HardnessOutput(
             Hardness_Shore_D=prediction,
+            **cost_time_results
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
+
+# --- v8: Endpoint 8: Multi-Material (Prediction) ---
+@app.post("/predict/multimaterial", response_model=MultiMaterialOutput)
+async def predict_multimaterial(inputs: MultiMaterialInput):
+    if model_multimaterial is None:
+        raise HTTPException(status_code=503, detail="Multi-Material model is not loaded.")
+        
+    try:
+        # 1. Get cost/time info
+        param_map = {
+            'infill': inputs.Infill_Density_percent,
+            'layer_height': inputs.Layer_Height_mm,
+            'speed': 60.0 # This model doesn't use speed, use default
+        }
+        cost_time_results = calculate_cost_time(inputs, param_map)
+
+        # 2. Get model prediction
+        features = pd.DataFrame([inputs.dict(exclude={'part_mass_g', 'filament_cost_kg', 'material_name'})])
+        prediction = model_multimaterial.predict(features)[0]
+        
+        # 3. Combine and return
+        return MultiMaterialOutput(
+            Tensile_Strength_MPa=prediction,
             **cost_time_results
         )
     except Exception as e:
@@ -559,7 +606,6 @@ WARPAGE_OPT_PARAMS = {
     ],
     "categorical": []
 }
-# v7: Add config for Hardness model
 HARDNESS_OPT_PARAMS = {
     "numeric": [
         ("Layer_Thickness_mm", 0.2, 0.5),
@@ -570,7 +616,18 @@ HARDNESS_OPT_PARAMS = {
         ("Fill_Pattern", ["Rectilinear", "Honey_Comb"])
     ]
 }
-# Add other models as needed...
+# v8: Add config for Multi-Material model
+MULTIMATERIAL_OPT_PARAMS = {
+    "numeric": [
+        ("Layer_Height_mm", 0.2, 0.4),
+        ("Extrusion_Temp_C", 230, 250),
+        ("Infill_Density_percent", 60, 100)
+    ],
+    "categorical": [
+        ("Material_A", ["ABS"]), # Dataset only has ABS as A
+        ("Material_B", ["PETG"]) # Dataset only has PETG as B
+    ]
+}
 
 class OptimizationProblem(Problem):
     """Defines the optimization problem for pymoo."""
@@ -619,7 +676,8 @@ class OptimizationProblem(Problem):
             "wall_thickness", "infill_density", "nozzle_temperature", 
             "bed_temperature", "print_speed", "fan_speed", 
             "Build_Orientation_deg", "Infill_Density_percent", "Number_of_Contours",
-            "Layer_Temperature_C", "Infill_Density_percent", "Fill_Density_percent"
+            "Layer_Temperature_C", "Infill_Density_percent", "Fill_Density_percent",
+            "Extrusion_Temp_C", "Infill_Density_percent" # v8
         ]
         for i, (name, _, _) in enumerate(param_config["numeric"]):
             if name in int_params:
@@ -687,6 +745,13 @@ class OptimizationProblem(Problem):
             param_map_key = {
                 'infill': 'Fill_Density_percent',
                 'layer_height': 'Layer_Thickness_mm',
+                'speed': 60.0 # Use default
+            }
+        elif self.model_name == "multimaterial": # v8
+            pred_map["Tensile_Strength_MPa"] = predictions # Single output model
+            param_map_key = {
+                'infill': 'Infill_Density_percent',
+                'layer_height': 'Layer_Height_mm',
                 'speed': 60.0 # Use default
             }
         else:
@@ -758,6 +823,9 @@ async def optimize(request: OptimizationRequest):
     elif request.model_name == "hardness":
         model = model_hardness
         param_config = HARDNESS_OPT_PARAMS
+    elif request.model_name == "multimaterial": # v8
+        model = model_multimaterial
+        param_config = MULTIMATERIAL_OPT_PARAMS
     # Add 'elif request.model_name == "c3":' etc. here
         
     if model is None:

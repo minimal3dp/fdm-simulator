@@ -28,7 +28,8 @@ PATH_FEA_RAW = os.path.join(RAW_DIR, "3D_Printing_Data.xlsx - Sheet1.csv")
 PATH_FATIGUE_RAW = os.path.join(RAW_DIR, "1-s2.0-S2352340922000580-mmc1.xlsx - Data.csv")
 PATH_ACCURACY_RAW = os.path.join(RAW_DIR, "dimensional_accuracy_deswal.csv")
 PATH_WARPAGE_RAW = os.path.join(RAW_DIR, "warpage_data_nazan.csv")
-PATH_HARDNESS_RAW = os.path.join(RAW_DIR, "hardness_data_kadam.csv") # v7: New Path
+PATH_HARDNESS_RAW = os.path.join(RAW_DIR, "hardness_data_kadam.csv")
+PATH_MULTIMATERIAL_RAW = os.path.join(RAW_DIR, "multimaterial_bond_yadav.csv") # v8: New Path
 
 PATH_C3_PROCESSED = os.path.join(PROCESSED_DIR, "c3_processed_data.csv")
 
@@ -38,7 +39,8 @@ MODEL_FEA_PATH = os.path.join(MODELS_DIR, "model_fea.joblib")
 MODEL_FATIGUE_PATH = os.path.join(MODELS_DIR, "model_fatigue.joblib")
 MODEL_ACCURACY_PATH = os.path.join(MODELS_DIR, "model_accuracy.joblib")
 MODEL_WARPAGE_PATH = os.path.join(MODELS_DIR, "model_warpage.joblib")
-MODEL_HARDNESS_PATH = os.path.join(MODELS_DIR, "model_hardness.joblib") # v7: New Model
+MODEL_HARDNESS_PATH = os.path.join(MODELS_DIR, "model_hardness.joblib")
+MODEL_MULTIMATERIAL_PATH = os.path.join(MODELS_DIR, "model_multimaterial.joblib") # v8: New Model
 
 # Path for FEA target names
 FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
@@ -401,6 +403,57 @@ def train_hardness_model():
     except Exception as e:
         print(f"Error training Hardness model: {e}")
 
+# --- v8: Model 8: Multi-Material Bond Strength ---
+def train_multimaterial_model():
+    """Trains the Multi-Material Bond Strength model (Yadav et al.)."""
+    print("--- Training Multi-Material Model ---")
+    try:
+        df = pd.read_csv(PATH_MULTIMATERIAL_RAW)
+        
+        # Define features and targets
+        feature_cols = [
+            "Material_A", "Material_B", "Layer_Height_mm", 
+            "Extrusion_Temp_C", "Infill_Density_percent"
+        ]
+        target_col = "Tensile_Strength_MPa"
+        
+        # Define numeric and categorical features
+        numeric_features = [
+            "Layer_Height_mm", "Extrusion_Temp_C", "Infill_Density_percent"
+        ]
+        categorical_features = ["Material_A", "Material_B"]
+
+        # Drop rows with NaN values
+        df = df.dropna(subset=feature_cols + [target_col])
+
+        X = df[feature_cols]
+        y = df[target_col]
+
+        # Define preprocessing
+        numeric_transformer = Pipeline(steps=[('scaler', StandardScaler())])
+        categorical_transformer = Pipeline(steps=[('onehot', OneHotEncoder(handle_unknown='ignore'))])
+
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ('num', numeric_transformer, numeric_features),
+                ('cat', categorical_transformer, categorical_features)
+            ])
+
+        # Create the full pipeline
+        pipeline = Pipeline(steps=[('preprocessor', preprocessor),
+                                   ('model', RandomForestRegressor(n_estimators=100, random_state=42))])
+
+        # Train the model
+        print("Training Multi-Material model...")
+        pipeline.fit(X, y)
+        joblib.dump(pipeline, MODEL_MULTIMATERIAL_PATH)
+        print(f"Multi-Material model saved to {MODEL_MULTIMATERIAL_PATH}")
+
+    except FileNotFoundError:
+        print(f"Error: Raw data file not found at {PATH_MULTIMATERIAL_RAW}")
+    except Exception as e:
+        print(f"Error training Multi-Material model: {e}")
+
 
 # --- Main execution ---
 def main():
@@ -447,11 +500,17 @@ def main():
     else:
         print("--- Warpage Model already trained. Skipping. ---")
 
-    # v7: Hardness Model
+    # Hardness Model
     if not os.path.exists(MODEL_HARDNESS_PATH):
         train_hardness_model()
     else:
         print("--- Hardness Model already trained. Skipping. ---")
+        
+    # v8: Multi-Material Model
+    if not os.path.exists(MODEL_MULTIMATERIAL_PATH):
+        train_multimaterial_model()
+    else:
+        print("--- Multi-Material Model already trained. Skipping. ---")
 
     print("\nAll models checked/trained.")
     print("Starting FastAPI server...")
