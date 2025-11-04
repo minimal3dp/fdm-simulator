@@ -27,11 +27,12 @@ MODEL_C3_PATH = os.path.join(MODELS_DIR, "model_c3.joblib")
 MODEL_FEA_PATH = os.path.join(MODELS_DIR, "model_fea.joblib")
 MODEL_FATIGUE_PATH = os.path.join(MODELS_DIR, "model_fatigue.joblib")
 MODEL_ACCURACY_PATH = os.path.join(MODELS_DIR, "model_accuracy.joblib")
-MODEL_WARPAGE_PATH = os.path.join(MODELS_DIR, "model_warpage.joblib") # v6: New Model
+MODEL_WARPAGE_PATH = os.path.join(MODELS_DIR, "model_warpage.joblib")
+MODEL_HARDNESS_PATH = os.path.join(MODELS_DIR, "model_hardness.joblib") # v7: New Model
 FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
 
 # --- FastAPI App Initialization ---
-app = FastAPI(title="FDM 3D Print Property Simulator API (v6)")
+app = FastAPI(title="FDM 3D Print Property Simulator API (v7)")
 
 # Configure CORS
 app.add_middleware(
@@ -48,7 +49,8 @@ model_c3 = None
 model_fea = None
 model_fatigue = None
 model_accuracy = None
-model_warpage = None # v6: New Model
+model_warpage = None
+model_hardness = None # v7: New Model
 fea_target_names = []
 materials_database = {}
 
@@ -139,6 +141,16 @@ class WarpageInput(GlobalInputs):
 
 class WarpageOutput(PredictionBase):
     Warpage_mm: float
+    
+# --- v7: Model 7: Hardness ---
+class HardnessInput(GlobalInputs):
+    Layer_Thickness_mm: float
+    Shell_Thickness_mm: float
+    Fill_Density_percent: int
+    Fill_Pattern: str
+
+class HardnessOutput(PredictionBase):
+    Hardness_Shore_D: float
 
 # --- v4: Optimization Pydantic Models ---
 class OptimizationObjective(BaseModel):
@@ -227,7 +239,7 @@ def calculate_cost_time(
 @app.on_event("startup")
 async def startup_event():
     """Load all models and data on server startup."""
-    global model_kaggle, model_c3, model_fea, model_fatigue, model_accuracy, model_warpage, fea_target_names, materials_database
+    global model_kaggle, model_c3, model_fea, model_fatigue, model_accuracy, model_warpage, model_hardness, fea_target_names, materials_database
     
     # Load Materials JSON
     try:
@@ -282,12 +294,20 @@ async def startup_event():
         print(f"Successfully loaded model 'warpage' from {MODEL_WARPAGE_PATH}")
     except Exception as e:
         print(f"Warning: Model file not found at {MODEL_WARPAGE_PATH}. Endpoint for 'warpage' will be disabled. Error: {e}")
+        
+    # v7: Load Model 7: Hardness
+    try:
+        model_hardness = joblib.load(MODEL_HARDNESS_PATH)
+        print(f"Successfully loaded model 'hardness' from {MODEL_HARDNESS_PATH}")
+    except Exception as e:
+        print(f"Warning: Model file not found at {MODEL_HARDNESS_PATH}. Endpoint for 'hardness' will be disabled. Error: {e}")
+
 
 # --- API Endpoints ---
 
 @app.get("/")
 def read_root():
-    return {"message": "FDM Property Simulator API (v6) is running."}
+    return {"message": "FDM Property Simulator API (v7) is running."}
 
 @app.get("/materials", response_model=Dict[str, dict])
 async def get_materials():
@@ -448,7 +468,7 @@ async def predict_accuracy(inputs: AccuracyInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
 
-# --- v6: Endpoint 6: Warpage (Prediction) ---
+# --- Endpoint 6: Warpage (Prediction) ---
 @app.post("/predict/warpage", response_model=WarpageOutput)
 async def predict_warpage(inputs: WarpageInput):
     if model_warpage is None:
@@ -470,6 +490,33 @@ async def predict_warpage(inputs: WarpageInput):
         # 3. Combine and return
         return WarpageOutput(
             Warpage_mm=prediction,
+            **cost_time_results
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
+
+# --- v7: Endpoint 7: Hardness (Prediction) ---
+@app.post("/predict/hardness", response_model=HardnessOutput)
+async def predict_hardness(inputs: HardnessInput):
+    if model_hardness is None:
+        raise HTTPException(status_code=503, detail="Hardness model is not loaded.")
+        
+    try:
+        # 1. Get cost/time info
+        param_map = {
+            'infill': inputs.Fill_Density_percent,
+            'layer_height': inputs.Layer_Thickness_mm,
+            'speed': 60.0 # Hardness model doesn't use speed, use default
+        }
+        cost_time_results = calculate_cost_time(inputs, param_map)
+
+        # 2. Get model prediction
+        features = pd.DataFrame([inputs.dict(exclude={'part_mass_g', 'filament_cost_kg', 'material_name'})])
+        prediction = model_hardness.predict(features)[0]
+        
+        # 3. Combine and return
+        return HardnessOutput(
+            Hardness_Shore_D=prediction,
             **cost_time_results
         )
     except Exception as e:
@@ -503,7 +550,6 @@ ACCURACY_OPT_PARAMS = {
     ],
     "categorical": [] # No categorical variables for this model
 }
-# v6: Add config for Warpage model
 WARPAGE_OPT_PARAMS = {
     "numeric": [
         ("Layer_Temperature_C", 190, 210),
@@ -512,6 +558,17 @@ WARPAGE_OPT_PARAMS = {
         ("Other_Layer_Height_mm", 0.3, 0.5)
     ],
     "categorical": []
+}
+# v7: Add config for Hardness model
+HARDNESS_OPT_PARAMS = {
+    "numeric": [
+        ("Layer_Thickness_mm", 0.2, 0.5),
+        ("Shell_Thickness_mm", 1.2, 1.6),
+        ("Fill_Density_percent", 20, 80),
+    ],
+    "categorical": [
+        ("Fill_Pattern", ["Rectilinear", "Honey_Comb"])
+    ]
 }
 # Add other models as needed...
 
@@ -562,7 +619,7 @@ class OptimizationProblem(Problem):
             "wall_thickness", "infill_density", "nozzle_temperature", 
             "bed_temperature", "print_speed", "fan_speed", 
             "Build_Orientation_deg", "Infill_Density_percent", "Number_of_Contours",
-            "Layer_Temperature_C", "Infill_Density_percent"
+            "Layer_Temperature_C", "Infill_Density_percent", "Fill_Density_percent"
         ]
         for i, (name, _, _) in enumerate(param_config["numeric"]):
             if name in int_params:
@@ -623,6 +680,13 @@ class OptimizationProblem(Problem):
             param_map_key = {
                 'infill': 'Infill_Density_percent',
                 'layer_height': 'Other_Layer_Height_mm',
+                'speed': 60.0 # Use default
+            }
+        elif self.model_name == "hardness":
+            pred_map["Hardness_Shore_D"] = predictions # Single output model
+            param_map_key = {
+                'infill': 'Fill_Density_percent',
+                'layer_height': 'Layer_Thickness_mm',
                 'speed': 60.0 # Use default
             }
         else:
@@ -691,6 +755,9 @@ async def optimize(request: OptimizationRequest):
     elif request.model_name == "warpage":
         model = model_warpage
         param_config = WARPAGE_OPT_PARAMS
+    elif request.model_name == "hardness":
+        model = model_hardness
+        param_config = HARDNESS_OPT_PARAMS
     # Add 'elif request.model_name == "c3":' etc. here
         
     if model is None:

@@ -1,0 +1,17 @@
+Layer_Thickness_mm,Shell_Thickness_mm,Fill_Density_percent,Fill_Pattern,Hardness_Shore_D
+0.2,1.2,20,Rectilinear,71.0
+0.2,1.2,60,Honey_Comb,71.86
+0.2,1.6,40,Honey_Comb,72.8
+0.2,1.6,80,Rectilinear,72.0
+0.3,1.2,40,Rectilinear,72.0
+0.3,1.2,80,Honey_Comb,72.66
+0.3,1.6,20,Honey_Comb,72.26
+0.3,1.6,60,Rectilinear,71.46
+0.4,1.2,20,Honey_Comb,72.06
+0.4,1.2,60,Rectilinear,71.13
+0.4,1.6,40,Rectilinear,72.4
+0.4,1.6,80,Honey_Comb,73.0
+0.5,1.2,40,Honey_Comb,72.46
+0.5,1.2,80,Rectilinear,72.86
+0.5,1.6,20,Rectilinear,72.6
+0.5,1.6,60,Honey_Comb,72.8

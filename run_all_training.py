@@ -27,7 +27,8 @@ PATH_C3_RAW = os.path.join(RAW_DIR, "C3-RAW DATA.csv")
 PATH_FEA_RAW = os.path.join(RAW_DIR, "3D_Printing_Data.xlsx - Sheet1.csv")
 PATH_FATIGUE_RAW = os.path.join(RAW_DIR, "1-s2.0-S2352340922000580-mmc1.xlsx - Data.csv")
 PATH_ACCURACY_RAW = os.path.join(RAW_DIR, "dimensional_accuracy_deswal.csv")
-PATH_WARPAGE_RAW = os.path.join(RAW_DIR, "warpage_data_nazan.csv") # v6: New Path
+PATH_WARPAGE_RAW = os.path.join(RAW_DIR, "warpage_data_nazan.csv")
+PATH_HARDNESS_RAW = os.path.join(RAW_DIR, "hardness_data_kadam.csv") # v7: New Path
 
 PATH_C3_PROCESSED = os.path.join(PROCESSED_DIR, "c3_processed_data.csv")
 
@@ -36,7 +37,8 @@ MODEL_C3_PATH = os.path.join(MODELS_DIR, "model_c3.joblib")
 MODEL_FEA_PATH = os.path.join(MODELS_DIR, "model_fea.joblib")
 MODEL_FATIGUE_PATH = os.path.join(MODELS_DIR, "model_fatigue.joblib")
 MODEL_ACCURACY_PATH = os.path.join(MODELS_DIR, "model_accuracy.joblib")
-MODEL_WARPAGE_PATH = os.path.join(MODELS_DIR, "model_warpage.joblib") # v6: New Model
+MODEL_WARPAGE_PATH = os.path.join(MODELS_DIR, "model_warpage.joblib")
+MODEL_HARDNESS_PATH = os.path.join(MODELS_DIR, "model_hardness.joblib") # v7: New Model
 
 # Path for FEA target names
 FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
@@ -348,6 +350,57 @@ def train_warpage_model():
     except Exception as e:
         print(f"Error training Warpage model: {e}")
 
+# --- v7: Model 7: Hardness ---
+def train_hardness_model():
+    """Trains the Hardness model (Kadam et al.)."""
+    print("--- Training Hardness Model ---")
+    try:
+        df = pd.read_csv(PATH_HARDNESS_RAW)
+        
+        # Define features and targets
+        feature_cols = [
+            "Layer_Thickness_mm", "Shell_Thickness_mm", 
+            "Fill_Density_percent", "Fill_Pattern"
+        ]
+        target_col = "Hardness_Shore_D"
+        
+        # Define numeric and categorical features
+        numeric_features = [
+            "Layer_Thickness_mm", "Shell_Thickness_mm", "Fill_Density_percent"
+        ]
+        categorical_features = ["Fill_Pattern"]
+
+        # Drop rows with NaN values
+        df = df.dropna(subset=feature_cols + [target_col])
+
+        X = df[feature_cols]
+        y = df[target_col]
+
+        # Define preprocessing
+        numeric_transformer = Pipeline(steps=[('scaler', StandardScaler())])
+        categorical_transformer = Pipeline(steps=[('onehot', OneHotEncoder(handle_unknown='ignore'))])
+
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ('num', numeric_transformer, numeric_features),
+                ('cat', categorical_transformer, categorical_features)
+            ])
+
+        # Create the full pipeline
+        pipeline = Pipeline(steps=[('preprocessor', preprocessor),
+                                   ('model', RandomForestRegressor(n_estimators=100, random_state=42))])
+
+        # Train the model
+        print("Training Hardness model...")
+        pipeline.fit(X, y)
+        joblib.dump(pipeline, MODEL_HARDNESS_PATH)
+        print(f"Hardness model saved to {MODEL_HARDNESS_PATH}")
+
+    except FileNotFoundError:
+        print(f"Error: Raw data file not found at {PATH_HARDNESS_RAW}")
+    except Exception as e:
+        print(f"Error training Hardness model: {e}")
+
 
 # --- Main execution ---
 def main():
@@ -388,11 +441,17 @@ def main():
     else:
         print("--- Accuracy Model already trained. Skipping. ---")
         
-    # v6: Warpage Model
+    # Warpage Model
     if not os.path.exists(MODEL_WARPAGE_PATH):
         train_warpage_model()
     else:
         print("--- Warpage Model already trained. Skipping. ---")
+
+    # v7: Hardness Model
+    if not os.path.exists(MODEL_HARDNESS_PATH):
+        train_hardness_model()
+    else:
+        print("--- Hardness Model already trained. Skipping. ---")
 
     print("\nAll models checked/trained.")
     print("Starting FastAPI server...")
