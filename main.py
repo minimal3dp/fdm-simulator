@@ -569,6 +569,7 @@ async def predict_multimaterial(inputs: MultiMaterialInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction error: {e}")
 
+
 # --- v4: Optimization Endpoint ---
 
 # Define problem parameters for each model
@@ -663,8 +664,9 @@ class OptimizationProblem(Problem):
             xu.append(len(options) - 1)
             
         # --- Define objectives and constraints ---
-        self.n_obj = len(request.objectives)
-        self.n_constr = len(request.constraints)
+        # --- FIX: Calculate n_obj and n_constr as local vars ---
+        n_obj_local = len(request.objectives)
+        n_constr_local = len(request.constraints)
         
         # Determine if variables are integers
         self.vtype = [float] * n_numeric
@@ -682,8 +684,14 @@ class OptimizationProblem(Problem):
         for i, (name, _, _) in enumerate(param_config["numeric"]):
             if name in int_params:
                 self.vtype[i] = int
+        
+        # --- FIX: Pass local n_obj and n_constr to super() ---
+        super().__init__(n_var=n_var, n_obj=n_obj_local, n_constr=n_constr_local, xl=xl, xu=xu)
+        
+        # --- FIX: Do NOT set self.n_obj and self.n_constr again. They are read-only properties. ---
+        # self.n_obj = n_obj_local <--- REMOVED
+        # self.n_constr = n_constr_local <--- REMOVED
 
-        super().__init__(n_var=n_var, n_obj=self.n_obj, n_constr=self.n_constr, xl=xl, xu=xu)
 
     def _evaluate(self, x, out, *args, **kwargs):
         # x is a 2D array (n_solutions, n_vars)
@@ -778,6 +786,7 @@ class OptimizationProblem(Problem):
         pred_map["estimated_print_time_min"] = cost_time_df["estimated_print_time_min"].values
 
         # 4. Calculate objectives (F)
+        # Use self.n_obj which was set by super()
         f_matrix = np.zeros((n_sols, self.n_obj))
         for i, obj in enumerate(self.request.objectives):
             if obj.name not in pred_map:
@@ -792,6 +801,7 @@ class OptimizationProblem(Problem):
         out["F"] = f_matrix
 
         # 5. Calculate constraints (G)
+        # Use self.n_constr which was set by super()
         if self.n_constr > 0:
             g_matrix = np.zeros((n_sols, self.n_constr))
             for i, constr in enumerate(self.request.constraints):
@@ -862,6 +872,13 @@ async def optimize(request: OptimizationRequest):
         results = []
         
         n_numeric = len(param_config["numeric"])
+        
+        # --- FIX for 'NoneType' error ---
+        # Check if optimization returned valid results
+        if res.F is None or res.X is None:
+            print("Warning: Optimization returned no valid solutions (res.F or res.X is None).")
+            return []
+            
         objective_values = res.F
         
         for i, sol_vector in enumerate(res.X):
@@ -905,4 +922,3 @@ async def optimize(request: OptimizationRequest):
     except Exception as e:
         print(f"Optimization error: {e}")
         raise HTTPException(status_code=500, detail=f"Optimization failed: {e}")
-

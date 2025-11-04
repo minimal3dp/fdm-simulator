@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FDM 3D Print Property Simulator (v7)</title>
+    <title>FDM 3D Print Property Simulator (v8)</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load three.js for 3D viewer -->
@@ -211,7 +211,7 @@
 
         <!-- Header -->
         <header class="mb-6">
-            <h1 class="text-3xl font-bold text-white">FDM 3D Print Property Simulator (v7)</h1>
+            <h1 class="text-3xl font-bold text-white">FDM 3D Print Property Simulator (v8)</h1>
             <p class="text-lg text-gray-400">Simulate mechanical properties or optimize parameters based on your goals.
             </p>
         </header>
@@ -272,13 +272,14 @@
                     Model</label>
                 <select id="modelSelector"
                     class="w-full max-w-md bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="kaggle" selected>Kaggle Model (Strength, Roughness, Elongation)</option>
-                    <option value="hardness">Hardness Model (Shore D)</option> <!-- v7: New -->
+                    <option value="kaggle" selected>Kaggle Model (Strength, Roughness)</option>
+                    <option value="multimaterial">Multi-Material Bond Strength</option> <!-- v8: New -->
+                    <option value="hardness">Hardness Model (Shore D)</option>
                     <option value="accuracy">Dimensional Accuracy (Error %)</option>
                     <option value="warpage">Warp Deformation (mm)</option>
-                    <option value="fatigue">Fatigue Lifetime Model (Cycles to Failure)</option>
-                    <option value="c3">C3 Model (Tensile Strength & Elongation)</option>
-                    <option value="fea">FEA Material Card (Anisotropic Properties)</option>
+                    <option value="fatigue">Fatigue Lifetime Model (Cycles)</option>
+                    <option value="c3">C3 Model (Tensile & Elongation)</option>
+                    <option value="fea">FEA Material Card (Anisotropic)</option>
                 </select>
             </div>
 
@@ -390,6 +391,54 @@
                             </div>
                             <!-- Hidden input for material type (PLA/ABS) -->
                             <input type="hidden" id="material" value="pla">
+                        </div>
+
+                        <!-- v8: Multi-Material Model Parameters -->
+                        <div id="multimaterial-params" class="model-params space-y-4 hidden">
+                            <div class="relative group">
+                                <label for="multimaterial_Material_A"
+                                    class="block text-sm font-medium text-gray-300 mb-2">Material A</label>
+                                <select id="multimaterial_Material_A"
+                                    class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
+                                    <option value="ABS">ABS</option>
+                                </select>
+                                <span class="tooltip">This model only supports ABS as the primary material.</span>
+                            </div>
+                            <div class="relative group">
+                                <label for="multimaterial_Material_B"
+                                    class="block text-sm font-medium text-gray-300 mb-2">Material B</label>
+                                <select id="multimaterial_Material_B"
+                                    class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
+                                    <option value="PETG">PETG</option>
+                                </select>
+                                <span class="tooltip">This model only supports PETG as the secondary material.</span>
+                            </div>
+                            <div class="relative group">
+                                <label for="multimaterial_Layer_Height_mm" class="slider-label"><span>Layer Height
+                                        (mm)</span><span id="multimaterial_Layer_Height_mm_val"
+                                        class="slider-value">0.3</span></label>
+                                <input type="range" id="multimaterial_Layer_Height_mm" min="0.2" max="0.4" step="0.1"
+                                    value="0.3" class="w-full">
+                                <span class="tooltip">Thickness of each individual printed layer.</span>
+                            </div>
+                            <div class="relative group">
+                                <label for="multimaterial_Extrusion_Temp_C" class="slider-label"><span>Extrusion Temp
+                                        (°C)</span><span id="multimaterial_Extrusion_Temp_C_val"
+                                        class="slider-value">240</span></label>
+                                <input type="range" id="multimaterial_Extrusion_Temp_C" min="230" max="250" step="10"
+                                    value="240" class="w-full">
+                                <span class="tooltip">Nozzle temperature. Critical for bonding between different
+                                    materials.</span>
+                            </div>
+                            <div class="relative group">
+                                <label for="multimaterial_Infill_Density_percent" class="slider-label"><span>Infill
+                                        Density (%)</span><span id="multimaterial_Infill_Density_percent_val"
+                                        class="slider-value">80</span></label>
+                                <input type="range" id="multimaterial_Infill_Density_percent" min="60" max="100"
+                                    step="20" value="80" class="w-full">
+                                <span class="tooltip">Infill density. Higher values increase the bonded surface
+                                    area.</span>
+                            </div>
                         </div>
 
                         <!-- v7: Hardness Model Parameters -->
@@ -763,6 +812,17 @@
                             </div>
                         </div>
 
+                        <!-- v8: Multi-Material Model Outputs -->
+                        <div id="multimaterial-outputs" class="model-outputs space-y-3 hidden">
+                            <div class="output-card">
+                                <div>
+                                    <div class="output-label">Predicted Bond Strength</div>
+                                    <div id="multimaterial_tensile_strength" class="output-value">...</div>
+                                </div>
+                                <div class="text-lg font-medium text-gray-400">MPa</div>
+                            </div>
+                        </div>
+
                         <!-- v7: Hardness Model Outputs -->
                         <div id="hardness-outputs" class="model-outputs space-y-3 hidden">
                             <div class="output-card">
@@ -902,6 +962,18 @@
                             </div>
                         </div>
 
+                        <!-- v8: Multi-Material Recommendations -->
+                        <div id="multimaterial-recs" class="model-recs space-y-4 hidden">
+                            <div>
+                                <h3 class="text-lg font-semibold text-green-400">To Maximize Bond Strength (ABS+PETG):
+                                </h3>
+                                <ul id="multimaterial-rec-quality"
+                                    class="list-disc list-inside text-gray-300 text-sm space-y-1">
+                                    <!-- JS will populate this -->
+                                </ul>
+                            </div>
+                        </div>
+
                         <!-- v7: Hardness Recommendations -->
                         <div id="hardness-recs" class="model-recs space-y-4 hidden">
                             <div>
@@ -993,11 +1065,11 @@
                                 Select Model to Optimize</label>
                             <select id="optimizerModelSelector"
                                 class="w-full max-w-md bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="kaggle" selected>Kaggle Model (Strength, Roughness, Elongation)</option>
-                                <option value="hardness">Hardness Model (Shore D)</option> <!-- v7: New -->
+                                <option value="kaggle" selected>Kaggle Model (Strength, Roughness)</option>
+                                <option value="multimaterial">Multi-Material Bond Strength</option> <!-- v8: New -->
+                                <option value="hardness">Hardness Model (Shore D)</option>
                                 <option value="accuracy">Dimensional Accuracy (Error %)</option>
                                 <option value="warpage">Warp Deformation (mm)</option>
-                                <!-- Add other optimizable models here, e.g., C3, Fatigue -->
                             </select>
                         </div>
 
@@ -1108,6 +1180,11 @@
                     <li>
                         <strong>Hardness:</strong> Based on the dataset from Kadam et al. (2019), "Process Parameter
                         Optimization for FDM 3D Printer."
+                    </li>
+                    <li>
+                        <strong>Multi-Material Bond:</strong> Based on the dataset from Yadav et al. (2019),
+                        "Optimization of FDM 3D printing process parameters for multi-material using artificial neural
+                        network."
                     </li>
                     <li>
                         <strong>Optimization Algorithm:</strong> Uses the NSGA-II genetic algorithm, a method validated
@@ -1308,13 +1385,24 @@
             };
         }
 
-        function getHardnessInputs() { // v7: New
+        function getHardnessInputs() {
             return {
                 ...getGlobalInputs(),
                 Layer_Thickness_mm: parseFloat(document.getElementById('hardness_Layer_Thickness_mm').value),
                 Shell_Thickness_mm: parseFloat(document.getElementById('hardness_Shell_Thickness_mm').value),
                 Fill_Density_percent: parseInt(document.getElementById('hardness_Fill_Density_percent').value),
                 Fill_Pattern: document.getElementById('hardness_Fill_Pattern').value,
+            };
+        }
+
+        function getMultimaterialInputs() { // v8: New
+            return {
+                ...getGlobalInputs(),
+                Material_A: document.getElementById('multimaterial_Material_A').value,
+                Material_B: document.getElementById('multimaterial_Material_B').value,
+                Layer_Height_mm: parseFloat(document.getElementById('multimaterial_Layer_Height_mm').value),
+                Extrusion_Temp_C: parseInt(document.getElementById('multimaterial_Extrusion_Temp_C').value),
+                Infill_Density_percent: parseInt(document.getElementById('multimaterial_Infill_Density_percent').value),
             };
         }
 
@@ -1369,39 +1457,30 @@
             document.getElementById('warpage_mm').textContent = data.Warpage_mm.toFixed(3);
         }
 
-        function updateHardnessUI(data) { // v7: New
+        function updateHardnessUI(data) {
             updateGlobalOutputs(data);
             document.getElementById('hardness_shore_d').textContent = data.Hardness_Shore_D.toFixed(1);
+        }
+
+        function updateMultimaterialUI(data) { // v8: New
+            updateGlobalOutputs(data);
+            document.getElementById('multimaterial_tensile_strength').textContent = data.Tensile_Strength_MPa.toFixed(2);
         }
 
         // --- Recommendation Engines ---
         function updateKaggleRecs(inputs) {
             const recQuality = [];
             const recSpeed = [];
-
-            // Quality
             if (inputs.layer_height <= 0.1) recQuality.push("Low layer height is good for quality.");
             else recQuality.push("Consider lowering layer height (< 0.1mm) for better finish and strength.");
-
             if (inputs.infill_density > 80) recQuality.push("High infill density is great for strength.");
             else recQuality.push("Increase infill density (> 80%) for maximum strength.");
-
             if (inputs.print_speed < 60) recQuality.push("Low print speed improves layer adhesion.");
             else recQuality.push("Reduce print speed (< 60mm/s) to increase strength.");
-
-            if (inputs.material === 'abs' && inputs.nozzle_temperature < 230) recQuality.push("Increase ABS temp (> 230°C) for better layer bonding.");
-            if (inputs.material === 'pla' && inputs.nozzle_temperature < 210) recQuality.push("Increase PLA temp (> 210°C) for better layer bonding.");
-
-            // Speed
             if (inputs.layer_height > 0.2) recSpeed.push("High layer height is great for speed.");
             else recSpeed.push("Increase layer height (> 0.2mm) to reduce print time.");
-
             if (inputs.infill_density < 30) recSpeed.push("Low infill density saves time and material.");
             else recSpeed.push("Lower infill density (< 30%) for faster, cheaper prints (if strength is not critical).");
-
-            if (inputs.print_speed > 90) recSpeed.push("High print speed is fast.");
-            else recSpeed.push("Increase print speed (> 90mm/s) to reduce print time.");
-
             document.getElementById('kaggle-rec-quality').innerHTML = recQuality.map(rec => `<li>${rec}</li>`).join('');
             document.getElementById('kaggle-rec-speed').innerHTML = recSpeed.map(rec => `<li>${rec}</li>`).join('');
         }
@@ -1412,8 +1491,6 @@
             else recStrength.push("Increase nozzle temp (> 210°C) for better layer bonding.");
             if (inputs.Fill > 90) recStrength.push("High infill density (> 90%) maximizes strength.");
             else recStrength.push("Increase infill density for higher strength.");
-            if (inputs.Height <= 0.1) recStrength.push("Low layer height (0.1mm) improves strength.");
-            else recStrength.push("Decrease layer height to 0.1mm for better strength.");
             document.getElementById('c3-rec-strength').innerHTML = recStrength.map(rec => `<li>${rec}</li>`).join('');
         }
 
@@ -1431,7 +1508,6 @@
             if (inputs.Layer_Thickness_mm > 0.2) recAccuracy.push("Thicker layers (> 0.2mm) can increase dimensional error.");
             else recAccuracy.push("Low layer thickness (≤ 0.2mm) is good for accuracy.");
             if (inputs.Build_Orientation_deg === 0) recAccuracy.push("A 0° orientation (aligned with X-axis) often gives the lowest length error.");
-            if (inputs.Build_Orientation_deg === 90) recAccuracy.push("A 90° orientation often gives the lowest width error.");
             document.getElementById('accuracy-rec-quality').innerHTML = recAccuracy.map(rec => `<li>${rec}</li>`).join('');
         }
 
@@ -1441,18 +1517,25 @@
             else recWarpage.push("Lower nozzle temps (≤ 200°C) help reduce warping.");
             if (inputs.Infill_Density_percent > 20) recWarpage.push("Higher infill density increases internal tension and warping.");
             else recWarpage.push("Low infill (≤ 20%) is recommended to minimize warping.");
-            if (inputs.First_Layer_Height_mm < 0.3) recWarpage.push("A thicker first layer (≥ 0.3mm) improves adhesion and can reduce corner lift.");
             document.getElementById('warpage-rec-quality').innerHTML = recWarpage.map(rec => `<li>${rec}</li>`).join('');
         }
 
-        function updateHardnessRecs(inputs) { // v7: New
+        function updateHardnessRecs(inputs) {
             const recHardness = [];
             if (inputs.Fill_Density_percent < 80) recHardness.push("Increase fill density (> 80%) for maximum hardness.");
             else recHardness.push("High fill density (80%) is ideal for hardness.");
             if (inputs.Shell_Thickness_mm < 1.6) recHardness.push("A thicker shell (1.6mm) improves surface hardness.");
             else recHardness.push("High shell thickness (1.6mm) is ideal.");
-            if (inputs.Layer_Thickness_mm > 0.3) recHardness.push("Lower layer thickness (≤ 0.3mm) can improve surface hardness.");
             document.getElementById('hardness-rec-quality').innerHTML = recHardness.map(rec => `<li>${rec}</li>`).join('');
+        }
+
+        function updateMultimaterialRecs(inputs) { // v8: New
+            const recStrength = [];
+            if (inputs.Extrusion_Temp_C < 250) recStrength.push("Increase extrusion temp (250°C) to maximize the bond between ABS and PETG.");
+            else recStrength.push("High extrusion temp (250°C) is ideal for ABS/PETG bonding.");
+            if (inputs.Infill_Density_percent < 100) recStrength.push("A 100% infill density creates the strongest possible bond.");
+            else recStrength.push("100% infill is ideal for bond strength.");
+            document.getElementById('multimaterial-rec-quality').innerHTML = recStrength.map(rec => `<li>${rec}</li>`).join('');
         }
 
         // --- State Management ---
@@ -1486,7 +1569,7 @@
             };
         }
 
-        // --- v7: Create a Simulation Map ---
+        // --- v8: Create a Simulation Map ---
         const simulationRunners = {
             "kaggle": async () => {
                 const inputs = getKaggleInputs();
@@ -1553,7 +1636,7 @@
                 updateWarpageUI(data);
                 updateWarpageRecs(inputs);
             },
-            "hardness": async () => { // v7: New
+            "hardness": async () => {
                 const inputs = getHardnessInputs();
                 const response = await fetchWithRetry(`${API_BASE_URL}/predict/hardness`, {
                     method: 'POST',
@@ -1563,6 +1646,17 @@
                 const data = await response.json();
                 updateHardnessUI(data);
                 updateHardnessRecs(inputs);
+            },
+            "multimaterial": async () => { // v8: New
+                const inputs = getMultimaterialInputs();
+                const response = await fetchWithRetry(`${API_BASE_URL}/predict/multimaterial`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(inputs)
+                });
+                const data = await response.json();
+                updateMultimaterialUI(data);
+                updateMultimaterialRecs(inputs);
             }
         };
 
@@ -1886,7 +1980,9 @@
 
                 // Trigger the correct simulation
                 const selectedModel = modelSelector.value;
-                debouncedSimRunners[selectedModel]();
+                if (debouncedSimRunners[selectedModel]) {
+                    debouncedSimRunners[selectedModel]();
+                }
             });
         });
 
@@ -1968,7 +2064,7 @@
                     "Layer_Temperature_C", "Infill_Density_percent", "First_Layer_Height_mm", "Other_Layer_Height_mm"
                 ]
             },
-            "hardness": { // v7: New
+            "hardness": {
                 objectives: [
                     { id: "Hardness_Shore_D", name: "Hardness (Shore D)", defaultGoal: "maximize" },
                     { id: "estimated_cost_usd", name: "Est. Cost ($)", defaultGoal: "minimize" },
@@ -1977,8 +2073,17 @@
                 constraints: [
                     "Layer_Thickness_mm", "Shell_Thickness_mm", "Fill_Density_percent"
                 ]
+            },
+            "multimaterial": { // v8: New
+                objectives: [
+                    { id: "Tensile_Strength_MPa", name: "Bond Strength (MPa)", defaultGoal: "maximize" },
+                    { id: "estimated_cost_usd", name: "Est. Cost ($)", defaultGoal: "minimize" },
+                    { id: "estimated_print_time_min", name: "Est. Time (min)", defaultGoal: "minimize" }
+                ],
+                constraints: [
+                    "Layer_Height_mm", "Extrusion_Temp_C", "Infill_Density_percent"
+                ]
             }
-            // Add C3, Fatigue configs here if desired
         };
 
         function populateOptimizerObjectives(modelName) {
@@ -2015,8 +2120,13 @@
             constraintIdCounter = 0; // Reset counter
 
             const config = optimizerConfig[modelName];
-            if (!config) return;
+            if (!config || config.constraints.length === 0) {
+                constraintsContainer.innerHTML = '<p class="text-sm text-gray-500">No constraints available for this model.</p>';
+                addConstraintBtn.classList.add('hidden');
+                return;
+            }
 
+            addConstraintBtn.classList.remove('hidden');
             // Create one default constraint
             createConstraintElement(config.constraints);
         }

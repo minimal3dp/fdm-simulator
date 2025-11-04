@@ -16,3 +16,8 @@ models/
 *.pkl
 *.joblib
 *.pt
+
+# Docs
+docs/research/
+*.pdf
+
