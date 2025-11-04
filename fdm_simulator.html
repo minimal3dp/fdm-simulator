@@ -1281,7 +1281,7 @@
             if (model === 'c3' || model === 'accuracy' || model === 'warpage') return "PLA"; // These datasets were PLA
 
             const selector = document.getElementById(selectorId);
-            if (selector.value) return selector.value;
+            if (selector && selector.value) return selector.value;
 
             // Fallback for Kaggle if no DB entry is selected
             if (model === 'kaggle') return document.getElementById('material').value;
@@ -1382,15 +1382,17 @@
         function updateFEAUI(data) {
             updateGlobalUI(data);
             const tableBody = document.getElementById('fea-results-table');
-            tableBody.innerHTML = ''; // Clear old results
-            for (const [key, value] of Object.entries(data.properties)) {
-                const row = `
-                    <tr class="bg-gray-800 border-b border-gray-700">
-                        <td class="py-2 px-4 font-medium">${key.replace(/_/g, ' ')}</td>
-                        <td class="py-2 px-4 text-blue-300 font-mono">${parseFloat(value).toFixed(4)}</td>
-                    </tr>
-                `;
-                tableBody.innerHTML += row;
+            if (tableBody) {
+                tableBody.innerHTML = ''; // Clear old results
+                for (const [key, value] of Object.entries(data.properties)) {
+                    const row = `
+                        <tr class="bg-gray-800 border-b border-gray-700">
+                            <td class="py-2 px-4 font-medium">${key.replace(/_/g, ' ')}</td>
+                            <td class="py-2 px-4 text-blue-300 font-mono">${parseFloat(value).toFixed(4)}</td>
+                        </tr>
+                    `;
+                    tableBody.innerHTML += row;
+                }
             }
         }
 
@@ -1901,7 +1903,7 @@
         function getAccuracyOptConfig() {
             return [
                 { name: "Var_Length_percent", label: "Length Error (%)", goal: "minimize" },
-                { name: D, "Var_Width_percent", label: "Width Error (%)", goal: "minimize" },
+                { name: "Var_Width_percent", label: "Width Error (%)", goal: "minimize" },
                 { name: "Var_Thickness_percent", label: "Thickness Error (%)", goal: "minimize" },
                 { name: "estimated_print_time_min", label: "Print Time (min)", goal: "minimize" },
                 { name: "estimated_cost_usd", label: "Material Cost (USD)", goal: "minimize" }
