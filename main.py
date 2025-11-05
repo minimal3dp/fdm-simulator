@@ -3,7 +3,7 @@ import joblib
 import pandas as pd
 import numpy as np
 import json
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any, Type
@@ -799,7 +799,11 @@ class GCodeAnalysisResult(BaseModel):
     optimization_suggestions: List[str]
 
 @app.post("/analyze_gcode", response_model=GCodeAnalysisResult)
-async def analyze_gcode(file: UploadFile = File(...)):
+async def analyze_gcode(
+    file: UploadFile = File(...),
+    material_name: Optional[str] = Form(None),
+    filament_diameter_mm: Optional[float] = Form(None),
+):
     """
     Analyzes a G-code file and returns detailed insights about the print.
     Based on research by Rivet et al., Pilch & Gibas, and Knirsch et al.
@@ -807,6 +811,9 @@ async def analyze_gcode(file: UploadFile = File(...)):
     try:
         # Read the uploaded file
         contents = await file.read()
+        # Enforce upload size limit (15 MB)
+        if len(contents) > 15 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="G-code file too large (limit 15 MB)")
         gcode_text = contents.decode('utf-8')
         
         # Note: We perform manual G-code parsing; no external parser required
@@ -817,10 +824,16 @@ async def analyze_gcode(file: UploadFile = File(...)):
         
         # Initialize counters and data structures
         layer_count = 0
+        current_layer = 0
         saw_layer_comment = False
         current_z = 0
         material_used_mm = 0  # Filament length in mm
         total_time_sec = 0
+        # G-code state
+        extrusion_mode_absolute = True  # M82 default
+        units_scale = 1.0  # G21 default (mm). If G20, set to 25.4
+        prev_e = 0.0
+        current_feed_mm_min = 1800.0  # reasonable default
         
         feature_types = {
             'outer_wall': 0,
@@ -844,7 +857,7 @@ async def analyze_gcode(file: UploadFile = File(...)):
         for line_num, line in enumerate(lines):
             line = line.strip()
             
-            # Skip empty lines and comments
+            # Skip empty lines and handle comments
             if not line or line.startswith(';'):
                 # Check for feature type comments (common in modern slicers)
                 if ';TYPE:' in line.upper():
@@ -865,10 +878,47 @@ async def analyze_gcode(file: UploadFile = File(...)):
                 # Check for layer changes
                 if ';LAYER:' in line.upper() or 'LAYER_CHANGE' in line.upper():
                     saw_layer_comment = True
-                    layer_count += 1
+                    # Try to parse explicit layer index if available
+                    try:
+                        if ':' in line:
+                            layer_idx_str = line.split(':', 1)[1].strip().split()[0]
+                            current_layer = int(layer_idx_str)
+                            layer_count = max(layer_count, current_layer)
+                        else:
+                            layer_count += 1
+                            current_layer = layer_count
+                    except Exception:
+                        layer_count += 1
+                        current_layer = layer_count
                 continue
             
-            # Parse G-code commands
+            # Modal and unit commands
+            upper = line.upper()
+            if upper.startswith('M82'):
+                extrusion_mode_absolute = True
+                continue
+            if upper.startswith('M83'):
+                extrusion_mode_absolute = False
+                continue
+            if upper.startswith('G21'):
+                units_scale = 1.0
+                continue
+            if upper.startswith('G20'):
+                units_scale = 25.4
+                continue
+            if upper.startswith('G92') and 'E' in upper:
+                # Reset extruder position
+                try:
+                    parts = line.split()
+                    for part in parts:
+                        if part.upper().startswith('E'):
+                            prev_e = float(part[1:]) * units_scale
+                            break
+                except Exception:
+                    prev_e = 0.0
+                continue
+
+            # Parse movement commands
             if line.startswith('G1') or line.startswith('G0'):
                 # Extract coordinates and extrusion
                 parts = line.split()
@@ -876,28 +926,39 @@ async def analyze_gcode(file: UploadFile = File(...)):
                 
                 for part in parts:
                     if part.startswith('X'):
-                        x = float(part[1:])
+                        x = float(part[1:]) * units_scale
                     elif part.startswith('Y'):
-                        y = float(part[1:])
+                        y = float(part[1:]) * units_scale
                     elif part.startswith('Z'):
-                        z = float(part[1:])
+                        z = float(part[1:]) * units_scale
                         # If slicer doesn't emit ;LAYER comments, derive layer by Z increase
                         if not saw_layer_comment and z > prev_z:
                             layer_count += 1
+                            current_layer = layer_count
                         if z > current_z:
                             current_z = z
                     elif part.startswith('E'):
-                        e = float(part[1:])
+                        e = float(part[1:]) * units_scale
                     elif part.startswith('F'):
                         f = float(part[1:])
-                        current_speed = f / 60  # Convert mm/min to mm/s
+                        current_feed_mm_min = f
+                        current_speed = (current_feed_mm_min / 60.0) if current_feed_mm_min > 0 else 0
                 
                 # Calculate movement
                 distance = np.sqrt((x - prev_x)**2 + (y - prev_y)**2 + (z - prev_z)**2)
                 
-                if e is not None and e > 0:
+                # Compute extrusion delta
+                delta_e = None
+                if e is not None:
+                    if extrusion_mode_absolute:
+                        delta_e = e - prev_e
+                        prev_e = e
+                    else:
+                        delta_e = e
+                
+                if delta_e is not None and delta_e > 0:
                     # Extrusion move
-                    material_used_mm += e
+                    material_used_mm += delta_e
                     feature_types[current_feature] += distance
                     
                     # Add to toolpath (sample every 10th segment to reduce data size)
@@ -907,7 +968,7 @@ async def analyze_gcode(file: UploadFile = File(...)):
                             'y': round(y, 2),
                             'z': round(z, 2),
                             'type': current_feature,
-                            'layer': layer_count
+                            'layer': int(current_layer)
                         })
                     
                     # Check for potential issues
@@ -916,6 +977,8 @@ async def analyze_gcode(file: UploadFile = File(...)):
                             warnings.append(f"High print speed detected ({current_speed:.0f} mm/s) - may affect quality")
                 
                 if distance > 0:
+                    # Use latest feed rate; travel moves also contribute
+                    current_speed = (current_feed_mm_min / 60.0) if current_feed_mm_min > 0 else 0
                     move_time = distance / current_speed if current_speed > 0 else 0
                     total_time_sec += move_time
                 
@@ -928,11 +991,19 @@ async def analyze_gcode(file: UploadFile = File(...)):
             for feature, distance in feature_types.items():
                 feature_breakdown[feature] = round((distance / total_distance) * 100, 2)
         
-        # Estimate material weight (assuming 1.75mm PLA at 1.24 g/cm³)
-        filament_diameter = 1.75  # mm
+        # Estimate material weight using provided material/diameter if present
+        filament_diameter = filament_diameter_mm if filament_diameter_mm and filament_diameter_mm > 0 else 1.75
+        # Density lookup from materials DB if material_name provided
+        density = 1.24
+        if material_name and materials_database:
+            mat = materials_database.get(material_name)
+            if isinstance(mat, dict):
+                dens = mat.get('density_g_cm3') or mat.get('common', {}).get('density_g_cm3')
+                if isinstance(dens, (int, float)) and dens > 0:
+                    density = float(dens)
         filament_area = np.pi * (filament_diameter / 2) ** 2
         volume_cm3 = (material_used_mm * filament_area) / 1000
-        material_used_g = volume_cm3 * 1.24  # PLA density
+        material_used_g = volume_cm3 * density
         
         # Generate optimization suggestions based on analysis
         if feature_breakdown.get('infill', 0) > 60:
