@@ -30,6 +30,7 @@ PATH_ACCURACY_RAW = os.path.join(RAW_DIR, "dimensional_accuracy_deswal.csv")
 PATH_WARPAGE_RAW = os.path.join(RAW_DIR, "warpage_data_nazan.csv")
 PATH_HARDNESS_RAW = os.path.join(RAW_DIR, "hardness_data_kadam.csv")
 PATH_MULTIMATERIAL_RAW = os.path.join(RAW_DIR, "multimaterial_bond_yadav.csv") # v8: New Path
+PATH_COMPOSITE_RAW = os.path.join(RAW_DIR, "composite_data_alarifi.csv") # v9: New Composite dataset path
 
 PATH_C3_PROCESSED = os.path.join(PROCESSED_DIR, "c3_processed_data.csv")
 
@@ -41,6 +42,7 @@ MODEL_ACCURACY_PATH = os.path.join(MODELS_DIR, "model_accuracy.joblib")
 MODEL_WARPAGE_PATH = os.path.join(MODELS_DIR, "model_warpage.joblib")
 MODEL_HARDNESS_PATH = os.path.join(MODELS_DIR, "model_hardness.joblib")
 MODEL_MULTIMATERIAL_PATH = os.path.join(MODELS_DIR, "model_multimaterial.joblib") # v8: New Model
+MODEL_COMPOSITE_PATH = os.path.join(MODELS_DIR, "model_composite.joblib") # v9: New Model
 
 # Path for FEA target names
 FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
@@ -455,6 +457,58 @@ def train_multimaterial_model():
         print(f"Error training Multi-Material model: {e}")
 
 
+# --- v9: Model 9: Composite Filaments (e.g., CF PLA/PETG) ---
+def train_composite_model():
+    """Trains the Composite Filament model (e.g., PETG/Carbon Fiber)."""
+    print("--- Training Composite Model ---")
+    try:
+        df = pd.read_csv(PATH_COMPOSITE_RAW)
+
+        # Define features and targets (based on Alarifi paper columns)
+        feature_cols = [
+            "Reinforcement_percent", "Infill_Pattern", "Infill_Density_percent",
+            "Layer_Thickness_mm"
+        ]
+        target_cols = ["Tensile_Strength_MPa", "Elastic_Modulus_GPa"]
+
+        # Define numeric and categorical features
+        numeric_features = [
+            "Reinforcement_percent", "Infill_Density_percent", "Layer_Thickness_mm"
+        ]
+        categorical_features = ["Infill_Pattern"]
+
+        # Drop rows with NaN values
+        df = df.dropna(subset=feature_cols + target_cols)
+
+        X = df[feature_cols]
+        y = df[target_cols]
+
+        # Preprocessing
+        numeric_transformer = Pipeline(steps=[('scaler', StandardScaler())])
+        categorical_transformer = Pipeline(steps=[('onehot', OneHotEncoder(handle_unknown='ignore'))])
+
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ('num', numeric_transformer, numeric_features),
+                ('cat', categorical_transformer, categorical_features)
+            ])
+
+        # Use MultiOutputRegressor for two targets
+        base_regressor = RandomForestRegressor(n_estimators=200, random_state=42, n_jobs=-1)
+        pipeline = Pipeline(steps=[('preprocessor', preprocessor),
+                                   ('model', MultiOutputRegressor(base_regressor))])
+
+        print("Training Composite model...")
+        pipeline.fit(X, y)
+        joblib.dump(pipeline, MODEL_COMPOSITE_PATH)
+        print(f"Composite model saved to {MODEL_COMPOSITE_PATH}")
+
+    except FileNotFoundError:
+        print(f"Error: Raw data file not found at {PATH_COMPOSITE_RAW}")
+    except Exception as e:
+        print(f"Error training Composite model: {e}")
+
+
 # --- Main execution ---
 def main():
     """Main function to run all processing and training."""
@@ -511,6 +565,12 @@ def main():
         train_multimaterial_model()
     else:
         print("--- Multi-Material Model already trained. Skipping. ---")
+
+    # v9: Composite Model
+    if not os.path.exists(MODEL_COMPOSITE_PATH):
+        train_composite_model()
+    else:
+        print("--- Composite Model already trained. Skipping. ---")
 
     print("\nAll models checked/trained.")
     print("Starting FastAPI server...")

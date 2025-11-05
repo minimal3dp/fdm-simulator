@@ -9,6 +9,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load three.js for 3D viewer -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/OrbitControls.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <style>
@@ -262,6 +263,7 @@
         <div role="tablist" class="flex items-center border-b border-gray-700 mb-6 space-x-2">
             <button id="tab-simulator" role="tab" aria-selected="true" class="tab-btn">Simulator</button>
             <button id="tab-optimizer" role="tab" aria-selected="false" class="tab-btn">Optimizer</button>
+            <button id="tab-gcode" role="tab" aria-selected="false" class="tab-btn">G-Code Analysis</button>
         </div>
 
         <!-- Simulator Tab Panel -->
@@ -273,6 +275,7 @@
                 <select id="modelSelector"
                     class="w-full max-w-md bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="kaggle" selected>Kaggle Model (Strength, Roughness)</option>
+                    <option value="composite">Composite Filament (CF/GF)</option> <!-- v9: New -->
                     <option value="multimaterial">Multi-Material Bond Strength</option> <!-- v8: New -->
                     <option value="hardness">Hardness Model (Shore D)</option>
                     <option value="accuracy">Dimensional Accuracy (Error %)</option>
@@ -438,6 +441,31 @@
                                     step="20" value="80" class="w-full">
                                 <span class="tooltip">Infill density. Higher values increase the bonded surface
                                     area.</span>
+                            </div>
+                        </div>
+
+                        <!-- v9: Composite Filament Parameters -->
+                        <div id="composite-params" class="model-params space-y-4 hidden">
+                            <div class="relative group">
+                                <label for="composite_Reinforcement_percent" class="slider-label"><span>Carbon Fiber Reinforcement (%)</span><span id="composite_Reinforcement_percent_val" class="slider-value">0</span></label>
+                                <input type="range" id="composite_Reinforcement_percent" min="0" max="40" step="5" value="0" class="w-full">
+                                <span class="tooltip">Weight percentage of carbon fiber reinforcement in the PETG composite.</span>
+                            </div>
+                            <div class="relative group">
+                                <label for="composite_Infill_Pattern" class="block text-sm font-medium text-gray-300 mb-2">Infill Pattern</label>
+                                <select id="composite_Infill_Pattern" class="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2">
+                                    <option value="Grid">Grid</option>
+                                    <option value="Tri-Hexagon">Tri-Hexagon</option>
+                                    <option value="Gyroid">Gyroid</option>
+                                </select>
+                            </div>
+                            <div class="relative group">
+                                <label for="composite_Infill_Density_percent" class="slider-label"><span>Infill Density (%)</span><span id="composite_Infill_Density_percent_val" class="slider-value">50</span></label>
+                                <input type="range" id="composite_Infill_Density_percent" min="25" max="75" step="25" value="50" class="w-full">
+                            </div>
+                            <div class="relative group">
+                                <label for="composite_Layer_Thickness_mm" class="slider-label"><span>Layer Thickness (mm)</span><span id="composite_Layer_Thickness_mm_val" class="slider-value">0.2</span></label>
+                                <input type="range" id="composite_Layer_Thickness_mm" min="0.1" max="0.3" step="0.1" value="0.2" class="w-full">
                             </div>
                         </div>
 
@@ -823,6 +851,24 @@
                             </div>
                         </div>
 
+                        <!-- v9: Composite Model Outputs -->
+                        <div id="composite-outputs" class="model-outputs space-y-3 hidden">
+                            <div class="output-card">
+                                <div>
+                                    <div class="output-label">Tensile Strength</div>
+                                    <div id="composite_Tensile_Strength_MPa" class="output-value">...</div>
+                                </div>
+                                <div class="text-lg font-medium text-gray-400">MPa</div>
+                            </div>
+                            <div class="output-card">
+                                <div>
+                                    <div class="output-label">Elastic Modulus</div>
+                                    <div id="composite_Elastic_Modulus_GPa" class="output-value">...</div>
+                                </div>
+                                <div class="text-lg font-medium text-gray-400">GPa</div>
+                            </div>
+                        </div>
+
                         <!-- v7: Hardness Model Outputs -->
                         <div id="hardness-outputs" class="model-outputs space-y-3 hidden">
                             <div class="output-card">
@@ -974,6 +1020,14 @@
                             </div>
                         </div>
 
+                        <!-- v9: Composite Recommendations -->
+                        <div id="composite-recs" class="model-recs space-y-4 hidden">
+                            <div>
+                                <h3 class="text-lg font-semibold text-green-400">To Maximize Composite Performance:</h3>
+                                <ul id="composite-rec-quality" class="list-disc list-inside text-gray-300 text-sm space-y-1"></ul>
+                            </div>
+                        </div>
+
                         <!-- v7: Hardness Recommendations -->
                         <div id="hardness-recs" class="model-recs space-y-4 hidden">
                             <div>
@@ -1066,6 +1120,7 @@
                             <select id="optimizerModelSelector"
                                 class="w-full max-w-md bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="kaggle" selected>Kaggle Model (Strength, Roughness)</option>
+                                <option value="composite">Composite Filament (CF/GF)</option> <!-- v9: New -->
                                 <option value="multimaterial">Multi-Material Bond Strength</option> <!-- v8: New -->
                                 <option value="hardness">Hardness Model (Shore D)</option>
                                 <option value="accuracy">Dimensional Accuracy (Error %)</option>
@@ -1141,6 +1196,155 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- G-Code Analysis Tab Panel (v9) -->
+        <div id="panel-gcode" role="tabpanel" class="tab-panel hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <!-- Column 1: Upload & Controls -->
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="simulator-card">
+                        <h2 class="text-xl font-semibold text-white mb-4">Upload G-Code File</h2>
+                        <p class="text-gray-400 text-sm mb-4">
+                            Upload your sliced G-code file to analyze toolpaths, estimate print time, 
+                            and receive AI-powered optimization suggestions.
+                        </p>
+                        <input type="file" id="gcodeAnalysisFile" accept=".gcode,.gco,.g" 
+                            class="block w-full text-sm text-gray-400
+                            file:mr-4 file:py-2 file:px-4
+                            file:rounded-full file:border-0
+                            file:text-sm file:font-semibold
+                            file:bg-blue-600 file:text-white
+                            hover:file:bg-blue-700 file:cursor-pointer
+                        " />
+                        <button id="analyzeGcodeBtn"
+                            class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                            Analyze G-Code
+                        </button>
+                        
+                        <div id="gcode-analysis-spinner" class="hidden text-center text-gray-400 mt-4">
+                            <svg class="animate-spin h-5 w-5 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg"
+                                fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            <p class="mt-2">Analyzing G-code...</p>
+                        </div>
+                        
+                        <div id="gcode-error-message"
+                            class="hidden text-center text-red-400 p-3 mt-4 bg-red-900 bg-opacity-30 rounded-lg">
+                            <p class="font-bold">Analysis Failed</p>
+                            <p id="gcode-error-text" class="text-sm">Error details here.</p>
+                        </div>
+                    </div>
+
+                    <!-- Statistics Panel -->
+                    <div id="gcode-stats-panel" class="simulator-card hidden">
+                        <h2 class="text-xl font-semibold text-white mb-4">Print Statistics</h2>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="output-card">
+                                <div>
+                                    <div class="output-label">Print Time</div>
+                                    <div id="gcode-print-time" class="output-value text-yellow-400">...</div>
+                                </div>
+                                <div class="text-lg font-medium text-gray-400 self-end">min</div>
+                            </div>
+                            <div class="output-card">
+                                <div>
+                                    <div class="output-label">Material Used</div>
+                                    <div id="gcode-material" class="output-value text-green-400">...</div>
+                                </div>
+                                <div class="text-lg font-medium text-gray-400 self-end">g</div>
+                            </div>
+                            <div class="output-card">
+                                <div>
+                                    <div class="output-label">Layer Count</div>
+                                    <div id="gcode-layers" class="output-value text-blue-400">...</div>
+                                </div>
+                            </div>
+                            <div class="output-card">
+                                <div>
+                                    <div class="output-label">Total Lines</div>
+                                    <div id="gcode-lines" class="output-value text-purple-400">...</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h3 class="text-lg font-semibold text-white mb-2">Feature Breakdown</h3>
+                            <div id="gcode-feature-breakdown" class="space-y-2">
+                                <!-- Will be populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Optimization Suggestions -->
+                    <div id="gcode-suggestions-panel" class="simulator-card hidden">
+                        <h2 class="text-xl font-semibold text-green-400 mb-4">AI Optimization Suggestions</h2>
+                        <ul id="gcode-suggestions-list" class="list-disc list-inside text-gray-300 text-sm space-y-2">
+                            <!-- Will be populated by JS -->
+                        </ul>
+                        
+                        <div id="gcode-warnings" class="mt-4 hidden">
+                            <h3 class="text-lg font-semibold text-yellow-400 mb-2">⚠️ Warnings</h3>
+                            <ul id="gcode-warnings-list" class="list-disc list-inside text-gray-300 text-sm space-y-1">
+                                <!-- Will be populated by JS -->
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column 2: 3D Toolpath Visualization -->
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="simulator-card">
+                        <h2 class="text-xl font-semibold text-white mb-4">Toolpath Visualization</h2>
+                        <p class="text-gray-400 text-sm mb-4">
+                            3D visualization of actual print toolpaths, color-coded by feature type.
+                        </p>
+                        <!-- Layer Scrubber -->
+                        <div class="mb-3 flex items-center gap-3">
+                            <label for="gcode-layer-slider" class="text-sm text-gray-300 whitespace-nowrap">Layer</label>
+                            <input id="gcode-layer-slider" type="range" min="0" max="0" value="0" class="w-full">
+                            <div id="gcode-layer-label" class="text-sm text-gray-300 w-24 text-right">0 / 0</div>
+                        </div>
+                        <div id="gcodeVisualizationCanvas" style="width: 100%; height: 500px; border-radius: 0.5rem; background-color: #1f2937;">
+                        </div>
+                        
+                        <!-- Legend -->
+                        <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full mr-2" style="background-color: #ef4444;"></div>
+                                <span class="text-gray-300">Outer Wall</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full mr-2" style="background-color: #f59e0b;"></div>
+                                <span class="text-gray-300">Inner Wall</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full mr-2" style="background-color: #3b82f6;"></div>
+                                <span class="text-gray-300">Infill</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full mr-2" style="background-color: #10b981;"></div>
+                                <span class="text-gray-300">Top Surface</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full mr-2" style="background-color: #8b5cf6;"></div>
+                                <span class="text-gray-300">Bottom Surface</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full mr-2" style="background-color: #ec4899;"></div>
+                                <span class="text-gray-300">Support</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -1406,6 +1610,16 @@
             };
         }
 
+        function getCompositeInputs() { // v9: New
+            return {
+                ...getGlobalInputs(),
+                Reinforcement_percent: parseFloat(document.getElementById('composite_Reinforcement_percent').value),
+                Infill_Pattern: document.getElementById('composite_Infill_Pattern').value,
+                Infill_Density_percent: parseInt(document.getElementById('composite_Infill_Density_percent').value),
+                Layer_Thickness_mm: parseFloat(document.getElementById('composite_Layer_Thickness_mm').value),
+            };
+        }
+
         // --- UI Updaters ---
         function updateGlobalOutputs(data) {
             document.getElementById('estimated_cost').textContent = `$${data.estimated_cost_usd.toFixed(2)}`;
@@ -1465,6 +1679,12 @@
         function updateMultimaterialUI(data) { // v8: New
             updateGlobalOutputs(data);
             document.getElementById('multimaterial_tensile_strength').textContent = data.Tensile_Strength_MPa.toFixed(2);
+        }
+
+        function updateCompositeUI(data) { // v9: New
+            updateGlobalOutputs(data);
+            document.getElementById('composite_Tensile_Strength_MPa').textContent = data.Tensile_Strength_MPa.toFixed(2);
+            document.getElementById('composite_Elastic_Modulus_GPa').textContent = data.Elastic_Modulus_GPa.toFixed(2);
         }
 
         // --- Recommendation Engines ---
@@ -1536,6 +1756,23 @@
             if (inputs.Infill_Density_percent < 100) recStrength.push("A 100% infill density creates the strongest possible bond.");
             else recStrength.push("100% infill is ideal for bond strength.");
             document.getElementById('multimaterial-rec-quality').innerHTML = recStrength.map(rec => `<li>${rec}</li>`).join('');
+        }
+
+        function updateCompositeRecs(inputs) { // v9: New
+            const recs = [];
+            if (inputs.Reinforcement_percent < 20) {
+                recs.push("Increase carbon fiber content (≥ 20%) for significantly higher stiffness and tensile modulus.");
+            }
+            if (inputs.Layer_Thickness_mm > 0.2) {
+                recs.push("Use thinner layers (≤ 0.2mm) to improve interlayer bonding in composites.");
+            }
+            if (inputs.Infill_Pattern === 'Gyroid') {
+                recs.push("Gyroid pattern provides good strength with moderate material usage.");
+            }
+            if (inputs.Infill_Density_percent < 50) {
+                recs.push("Increase infill density (≥ 50%) for better mechanical properties in composite parts.");
+            }
+            document.getElementById('composite-rec-quality').innerHTML = recs.map(rec => `<li>${rec}</li>`).join('');
         }
 
         // --- State Management ---
@@ -1657,6 +1894,17 @@
                 const data = await response.json();
                 updateMultimaterialUI(data);
                 updateMultimaterialRecs(inputs);
+            },
+            "composite": async () => { // v9: New
+                const inputs = getCompositeInputs();
+                const response = await fetchWithRetry(`${API_BASE_URL}/predict/composite`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(inputs)
+                });
+                const data = await response.json();
+                updateCompositeUI(data);
+                updateCompositeRecs(inputs);
             }
         };
 
@@ -2006,6 +2254,10 @@
                 panels.forEach(p => {
                     if (p.id === panelId) {
                         p.removeAttribute('hidden');
+                        if (panelId === 'panel-gcode') {
+                            // Initialize the G-code visualization when tab is shown
+                            initGcodeVisualization();
+                        }
                     } else {
                         p.setAttribute('hidden', 'true');
                     }
@@ -2042,6 +2294,17 @@
                     "bed_temperature", "print_speed", "fan_speed"
                 ]
             },
+                "composite": { // v9: New
+                    objectives: [
+                        { id: "Tensile_Strength_MPa", name: "Tensile Strength (MPa)", defaultGoal: "maximize" },
+                        { id: "Elastic_Modulus_GPa", name: "Elastic Modulus (GPa)", defaultGoal: "maximize" },
+                        { id: "estimated_cost_usd", name: "Est. Cost ($)", defaultGoal: "minimize" },
+                        { id: "estimated_print_time_min", name: "Est. Time (min)", defaultGoal: "minimize" }
+                    ],
+                    constraints: [
+                        "Reinforcement_percent", "Infill_Density_percent", "Layer_Thickness_mm"
+                    ]
+                },
             "accuracy": {
                 objectives: [
                     { id: "Var_Length_percent", name: "Length Error (%)", defaultGoal: "minimize" },
@@ -2268,6 +2531,274 @@
             });
             resultsBody.innerHTML = bodyHtml;
         }
+
+            // ===== G-Code Analysis (v9) =====
+        let gcodeScene, gcodeCamera, gcodeRenderer, gcodeControls;
+        let gcodeContainer, gcodeBounds, gcodeCenter, gcodeMaxDim;
+        let gcodeOriginalSegments = [];
+        let gcodeLayerMax = 0;
+
+            function initGcodeVisualization() {
+                gcodeContainer = document.getElementById('gcodeVisualizationCanvas');
+                if (!gcodeContainer || gcodeScene) return; // Already initialized
+            
+                gcodeScene = new THREE.Scene();
+                gcodeScene.background = new THREE.Color(0x1f2937);
+            
+                gcodeCamera = new THREE.PerspectiveCamera(45, gcodeContainer.clientWidth / gcodeContainer.clientHeight, 0.1, 2000);
+                gcodeCamera.position.set(100, 100, 100);
+                gcodeCamera.lookAt(0, 0, 0);
+            
+                gcodeRenderer = new THREE.WebGLRenderer({ antialias: true });
+                gcodeRenderer.setSize(gcodeContainer.clientWidth, gcodeContainer.clientHeight);
+                gcodeContainer.appendChild(gcodeRenderer.domElement);
+            
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                gcodeScene.add(ambientLight);
+            
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(10, 10, 5);
+                gcodeScene.add(directionalLight);
+            
+                const gridHelper = new THREE.GridHelper(200, 20);
+                gcodeScene.add(gridHelper);
+            
+                const axesHelper = new THREE.AxesHelper(50);
+                gcodeScene.add(axesHelper);
+            
+                // Orbit controls
+                if (THREE.OrbitControls) {
+                    gcodeControls = new THREE.OrbitControls(gcodeCamera, gcodeRenderer.domElement);
+                    gcodeControls.enableDamping = true;
+                    gcodeControls.dampingFactor = 0.08;
+                    gcodeControls.screenSpacePanning = true;
+                    gcodeControls.minDistance = 5;
+                    gcodeControls.maxDistance = 2000;
+                }
+
+                // Handle window resize
+                window.addEventListener('resize', onGcodeResize);
+
+                animateGcode();
+            }
+
+            function onGcodeResize() {
+                if (!gcodeContainer || !gcodeRenderer || !gcodeCamera) return;
+                const w = gcodeContainer.clientWidth;
+                const h = gcodeContainer.clientHeight;
+                if (w === 0 || h === 0) return;
+                gcodeRenderer.setSize(w, h);
+                gcodeCamera.aspect = w / h;
+                gcodeCamera.updateProjectionMatrix();
+                // Fit camera to current bounds on resize
+                if (gcodeCenter && gcodeMaxDim) fitCameraToCurrentBounds();
+            }
+
+            function animateGcode() {
+                if (!gcodeRenderer || !gcodeScene || !gcodeCamera) return;
+                requestAnimationFrame(animateGcode);
+                if (gcodeControls) gcodeControls.update();
+                gcodeRenderer.render(gcodeScene, gcodeCamera);
+            }
+
+            function fitCameraToCurrentBounds() {
+                if (!gcodeCenter || !gcodeMaxDim || !gcodeCamera || !gcodeControls) return;
+                gcodeCamera.position.set(
+                    gcodeCenter.x + gcodeMaxDim * 1.5,
+                    gcodeCenter.y + gcodeMaxDim * 1.5,
+                    gcodeCenter.z + gcodeMaxDim * 1.5
+                );
+                gcodeCamera.lookAt(gcodeCenter);
+                gcodeControls.target.copy(gcodeCenter);
+            }
+
+            function renderToolpaths(segments) {
+                if (!gcodeScene) initGcodeVisualization();
+            
+                // Clear previous toolpaths
+                while (gcodeScene.children.length > 4) { // Keep lights, grid, axes
+                    gcodeScene.remove(gcodeScene.children[4]);
+                }
+            
+                const featureColors = {
+                    'outer_wall': 0xef4444,    // red
+                    'inner_wall': 0xf59e0b,    // orange
+                    'infill': 0x3b82f6,        // blue
+                    'top_surface': 0x10b981,   // green
+                    'bottom_surface': 0x8b5cf6, // purple
+                    'support': 0xec4899,       // pink
+                    'unknown': 0x6b7280        // gray
+                };
+            
+                if (!segments || segments.length === 0) return;
+            
+                // Group segments by feature type
+                const groupedSegments = {};
+                segments.forEach(seg => {
+                    const type = (seg.type || seg.feature_type) || 'unknown';
+                    if (!groupedSegments[type]) groupedSegments[type] = [];
+                    groupedSegments[type].push(seg);
+                });
+            
+                // Create line geometry for each feature type
+                Object.entries(groupedSegments).forEach(([featureType, segs]) => {
+                    const points = segs.map(seg => new THREE.Vector3(seg.x, seg.z, seg.y));
+                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                    const material = new THREE.LineBasicMaterial({ 
+                        color: featureColors[featureType] || featureColors['unknown'],
+                        linewidth: 2
+                    });
+                    const line = new THREE.Line(geometry, material);
+                    gcodeScene.add(line);
+                });
+            
+                // Store bounds and fit camera
+                const allPoints = segments.map(seg => new THREE.Vector3(seg.x, seg.z, seg.y));
+                gcodeBounds = new THREE.Box3().setFromPoints(allPoints);
+                gcodeCenter = gcodeBounds.getCenter(new THREE.Vector3());
+                const size = gcodeBounds.getSize(new THREE.Vector3());
+                gcodeMaxDim = Math.max(size.x, size.y, size.z);
+                if (gcodeControls) gcodeControls.target.copy(gcodeCenter);
+                fitCameraToCurrentBounds();
+            }
+
+            function filterSegmentsUpToLayer(segments, layer) {
+                if (segments.length === 0) return segments;
+                // Prefer explicit layer index if present, else infer by Z ranking
+                if (segments[0].layer !== undefined) {
+                    return segments.filter(s => (s.layer || 0) <= layer);
+                }
+                // Fallback: infer layers by unique Z values
+                const uniqueZ = Array.from(new Set(segments.map(s => s.z))).sort((a,b) => a-b);
+                const zThreshold = uniqueZ[Math.min(layer, uniqueZ.length - 1)] ?? uniqueZ[uniqueZ.length - 1];
+                return segments.filter(s => s.z <= zThreshold);
+            }
+
+        function displayGCodeAnalysis(result) {
+            // Show stats panel
+            document.getElementById('gcode-stats-panel').classList.remove('hidden');
+            document.getElementById('gcode-print-time').textContent = result.print_time_estimate_min.toFixed(1);
+            document.getElementById('gcode-material').textContent = result.material_used_g.toFixed(2);
+            document.getElementById('gcode-layers').textContent = result.layer_count;
+            document.getElementById('gcode-lines').textContent = result.total_lines;
+            
+            // Setup scrubber
+            gcodeOriginalSegments = result.toolpath_segments || [];
+            gcodeLayerMax = result.layer_count || 0;
+            const slider = document.getElementById('gcode-layer-slider');
+            const label = document.getElementById('gcode-layer-label');
+            slider.max = gcodeLayerMax;
+            slider.value = gcodeLayerMax;
+            label.textContent = `${gcodeLayerMax} / ${gcodeLayerMax}`;
+            slider.oninput = () => {
+                const val = parseInt(slider.value, 10) || 0;
+                label.textContent = `${val} / ${gcodeLayerMax}`;
+                const filtered = filterSegmentsUpToLayer(gcodeOriginalSegments, val);
+                renderToolpaths(filtered);
+            };
+            
+            // Feature breakdown
+            const breakdownDiv = document.getElementById('gcode-feature-breakdown');
+            let breakdownHtml = '';
+            Object.entries(result.feature_breakdown).forEach(([feature, percent]) => {
+                const colorMap = {
+                    'outer_wall': 'bg-red-500',
+                    'inner_wall': 'bg-orange-500',
+                    'infill': 'bg-blue-500',
+                    'top_surface': 'bg-green-500',
+                    'bottom_surface': 'bg-purple-500',
+                    'support': 'bg-pink-500',
+                    'unknown': 'bg-gray-500'
+                };
+                const color = colorMap[feature] || 'bg-gray-500';
+                breakdownHtml += `
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-gray-300">${feature.replace(/_/g, ' ')}</span>
+                            <span class="text-gray-400">${percent.toFixed(1)}%</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2">
+                            <div class="${color} h-2 rounded-full" style="width: ${percent}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            breakdownDiv.innerHTML = breakdownHtml;
+            
+            // Optimization suggestions
+            const suggestionsPanel = document.getElementById('gcode-suggestions-panel');
+            suggestionsPanel.classList.remove('hidden');
+            const suggestionsList = document.getElementById('gcode-suggestions-list');
+            let suggestionsHtml = '';
+            result.optimization_suggestions.forEach(suggestion => {
+                suggestionsHtml += `<li class="text-green-300">${suggestion}</li>`;
+            });
+            suggestionsList.innerHTML = suggestionsHtml || '<li class="text-gray-500">No suggestions available.</li>';
+            
+            // Warnings
+            const warningsDiv = document.getElementById('gcode-warnings');
+            if (result.warnings && result.warnings.length > 0) {
+                warningsDiv.classList.remove('hidden');
+                const warningsList = document.getElementById('gcode-warnings-list');
+                let warningsHtml = '';
+                result.warnings.forEach(warning => {
+                    warningsHtml += `<li class="text-yellow-300">${warning}</li>`;
+                });
+                warningsList.innerHTML = warningsHtml;
+            } else {
+                warningsDiv.classList.add('hidden');
+            }
+            
+            // Render toolpaths (full)
+            if (gcodeOriginalSegments.length > 0) {
+                renderToolpaths(gcodeOriginalSegments);
+            }
+        }            document.getElementById('analyzeGcodeBtn').addEventListener('click', async () => {
+                const fileInput = document.getElementById('gcodeAnalysisFile');
+                const file = fileInput.files[0];
+            
+                if (!file) {
+                    alert('Please select a G-code file first.');
+                    return;
+                }
+            
+                const spinner = document.getElementById('gcode-analysis-spinner');
+                const errorDiv = document.getElementById('gcode-error-message');
+                const errorText = document.getElementById('gcode-error-text');
+            
+                // Hide previous results and errors
+                document.getElementById('gcode-stats-panel').classList.add('hidden');
+                document.getElementById('gcode-suggestions-panel').classList.add('hidden');
+                errorDiv.classList.add('hidden');
+            
+                // Show spinner
+                spinner.classList.remove('hidden');
+            
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                
+                    const response = await fetch(`${API_BASE_URL}/analyze_gcode`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || `Server error: ${response.status}`);
+                    }
+                
+                    const result = await response.json();
+                    displayGCodeAnalysis(result);
+                
+                } catch (error) {
+                    console.error('G-Code analysis failed:', error);
+                    errorText.textContent = error.message || 'Unknown error occurred.';
+                    errorDiv.classList.remove('hidden');
+                } finally {
+                    spinner.classList.add('hidden');
+                }
+            });
 
         // --- Initial Run ---
         loadMaterials(); // Load the materials DB first

@@ -3,10 +3,12 @@ import joblib
 import pandas as pd
 import numpy as np
 import json
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any, Type
+import io
+# Optional: External G-code parser not required for our analysis; using manual parsing
 
 # --- v4: Optimization Imports ---
 from pymoo.core.problem import Problem
@@ -149,6 +151,17 @@ class MultiMaterialInput(GlobalInputs):
 class MultiMaterialOutput(PredictionBase):
     Tensile_Strength_MPa: float
 
+# --- v9: Model 9: Composite Filaments ---
+class CompositeInput(GlobalInputs):
+    Reinforcement_percent: float
+    Infill_Pattern: str
+    Infill_Density_percent: int
+    Layer_Thickness_mm: float
+
+class CompositeOutput(PredictionBase):
+    Tensile_Strength_MPa: float
+    Elastic_Modulus_GPa: float
+
 # --- v4: Optimization Pydantic Models ---
 class OptimizationObjective(BaseModel):
     name: str # e.g., "tensile_strength", "estimated_cost_usd"
@@ -280,6 +293,24 @@ def get_model_registry() -> Dict[str, Dict[str, Any]]:
                     ("Infill_Density_percent", 60, 100)
                 ],
                 "categorical": [("Material_A", ["ABS"]), ("Material_B", ["PETG"])]
+            }
+        },
+        "composite": {
+            "path": os.path.join(MODELS_DIR, "model_composite.joblib"),
+            "model": None,
+            "input_model": CompositeInput,
+            "output_model": CompositeOutput,
+            "output_names": ["Tensile_Strength_MPa", "Elastic_Modulus_GPa"],
+            "cost_time_params": {
+                'infill': 'Infill_Density_percent', 'layer_height': 'Layer_Thickness_mm', 'speed': 60.0
+            },
+            "optimizer_config": {
+                "numeric": [
+                    ("Reinforcement_percent", 0, 40),
+                    ("Infill_Density_percent", 20, 100),
+                    ("Layer_Thickness_mm", 0.1, 0.4)
+                ],
+                "categorical": [("Infill_Pattern", ["Grid", "Tri-Hexagon", "Gyroid"])]
             }
         }
     }
@@ -494,6 +525,10 @@ async def predict_hardness(inputs: HardnessInput):
 async def predict_multimaterial(inputs: MultiMaterialInput):
     return await _run_prediction("multimaterial", inputs)
 
+@app.post("/predict/composite", response_model=CompositeOutput)
+async def predict_composite(inputs: CompositeInput):
+    return await _run_prediction("composite", inputs)
+
 
 # --- v4: Optimization Endpoint ---
 
@@ -547,7 +582,9 @@ class OptimizationProblem(Problem):
             "bed_temperature", "print_speed", "fan_speed", 
             "Build_Orientation_deg", "Infill_Density_percent", "Number_of_Contours",
             "Layer_Temperature_C", "Infill_Density_percent", "Fill_Density_percent",
-            "Extrusion_Temp_C", "Infill_Density_percent"
+            "Extrusion_Temp_C", "Infill_Density_percent",
+            # v9: Composite params (PascalCase)
+            "Print_Speed", "Nozzle_Temperature", "Bed_Temperature"
         ]
         for i, (name, _, _) in enumerate(param_config["numeric"]):
             if name in int_params:
@@ -744,3 +781,187 @@ async def optimize(request: OptimizationRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Optimization failed: {e}")
+
+
+# --- v9: G-Code Analysis Endpoint ---
+
+class GCodeAnalysisResult(BaseModel):
+    """Response model for G-code analysis."""
+    filename: str
+    total_lines: int
+    print_time_estimate_min: float
+    material_used_g: float
+    layer_count: int
+    feature_breakdown: Dict[str, float]  # Percentage of each feature type
+    toolpath_segments: List[Dict[str, Any]]  # Simplified toolpath data for visualization
+    statistics: Dict[str, Any]
+    warnings: List[str]
+    optimization_suggestions: List[str]
+
+@app.post("/analyze_gcode", response_model=GCodeAnalysisResult)
+async def analyze_gcode(file: UploadFile = File(...)):
+    """
+    Analyzes a G-code file and returns detailed insights about the print.
+    Based on research by Rivet et al., Pilch & Gibas, and Knirsch et al.
+    """
+    try:
+        # Read the uploaded file
+        contents = await file.read()
+        gcode_text = contents.decode('utf-8')
+        
+    # Note: We perform manual G-code parsing; no external parser required
+        
+        # Split into lines for analysis
+        lines = gcode_text.split('\n')
+        total_lines = len(lines)
+        
+        # Initialize counters and data structures
+        layer_count = 0
+        current_z = 0
+        material_used_mm = 0  # Filament length in mm
+        total_time_sec = 0
+        
+        feature_types = {
+            'outer_wall': 0,
+            'inner_wall': 0,
+            'infill': 0,
+            'top_surface': 0,
+            'bottom_surface': 0,
+            'support': 0,
+            'unknown': 0
+        }
+        
+        toolpath_segments = []
+        warnings = []
+        optimization_suggestions = []
+        
+        current_feature = 'unknown'
+        prev_x, prev_y, prev_z = 0, 0, 0
+        current_speed = 60  # mm/s default
+        
+        # Parse G-code line by line
+        for line_num, line in enumerate(lines):
+            line = line.strip()
+            
+            # Skip empty lines and comments
+            if not line or line.startswith(';'):
+                # Check for feature type comments (common in modern slicers)
+                if ';TYPE:' in line.upper():
+                    feature_tag = line.split(':')[1].strip().lower()
+                    if 'outer' in feature_tag or 'external' in feature_tag:
+                        current_feature = 'outer_wall'
+                    elif 'inner' in feature_tag or 'perimeter' in feature_tag:
+                        current_feature = 'inner_wall'
+                    elif 'infill' in feature_tag or 'fill' in feature_tag:
+                        current_feature = 'infill'
+                    elif 'top' in feature_tag:
+                        current_feature = 'top_surface'
+                    elif 'bottom' in feature_tag:
+                        current_feature = 'bottom_surface'
+                    elif 'support' in feature_tag:
+                        current_feature = 'support'
+                
+                # Check for layer changes
+                if ';LAYER:' in line.upper() or 'LAYER_CHANGE' in line.upper():
+                    layer_count += 1
+                continue
+            
+            # Parse G-code commands
+            if line.startswith('G1') or line.startswith('G0'):
+                # Extract coordinates and extrusion
+                parts = line.split()
+                x, y, z, e, f = prev_x, prev_y, prev_z, None, None
+                
+                for part in parts:
+                    if part.startswith('X'):
+                        x = float(part[1:])
+                    elif part.startswith('Y'):
+                        y = float(part[1:])
+                    elif part.startswith('Z'):
+                        z = float(part[1:])
+                        if z > current_z:
+                            current_z = z
+                    elif part.startswith('E'):
+                        e = float(part[1:])
+                    elif part.startswith('F'):
+                        f = float(part[1:])
+                        current_speed = f / 60  # Convert mm/min to mm/s
+                
+                # Calculate movement
+                distance = np.sqrt((x - prev_x)**2 + (y - prev_y)**2 + (z - prev_z)**2)
+                
+                if e is not None and e > 0:
+                    # Extrusion move
+                    material_used_mm += e
+                    feature_types[current_feature] += distance
+                    
+                    # Add to toolpath (sample every 10th segment to reduce data size)
+                    if line_num % 10 == 0:
+                        toolpath_segments.append({
+                            'x': round(x, 2),
+                            'y': round(y, 2),
+                            'z': round(z, 2),
+                            'type': current_feature,
+                            'layer': layer_count
+                        })
+                    
+                    # Check for potential issues
+                    if current_speed > 150:
+                        if 'High print speed detected' not in warnings:
+                            warnings.append(f"High print speed detected ({current_speed:.0f} mm/s) - may affect quality")
+                
+                if distance > 0:
+                    move_time = distance / current_speed if current_speed > 0 else 0
+                    total_time_sec += move_time
+                
+                prev_x, prev_y, prev_z = x, y, z
+        
+        # Calculate feature breakdown percentages
+        total_distance = sum(feature_types.values())
+        feature_breakdown = {}
+        if total_distance > 0:
+            for feature, distance in feature_types.items():
+                feature_breakdown[feature] = round((distance / total_distance) * 100, 2)
+        
+        # Estimate material weight (assuming 1.75mm PLA at 1.24 g/cm³)
+        filament_diameter = 1.75  # mm
+        filament_area = np.pi * (filament_diameter / 2) ** 2
+        volume_cm3 = (material_used_mm * filament_area) / 1000
+        material_used_g = volume_cm3 * 1.24  # PLA density
+        
+        # Generate optimization suggestions based on analysis
+        if feature_breakdown.get('infill', 0) > 60:
+            optimization_suggestions.append("High infill detected - consider reducing to 20-40% to save material and time")
+        
+        if feature_breakdown.get('support', 0) > 10:
+            optimization_suggestions.append("Significant support material detected - consider reorienting part")
+        
+        if layer_count > 500:
+            optimization_suggestions.append("High layer count - consider increasing layer height for faster printing")
+        
+        # Calculate statistics
+        statistics = {
+            'avg_layer_time_sec': round(total_time_sec / layer_count, 2) if layer_count > 0 else 0,
+            'estimated_height_mm': round(current_z, 2),
+            'total_toolpath_length_mm': round(total_distance, 2),
+            'material_per_layer_g': round(material_used_g / layer_count, 3) if layer_count > 0 else 0
+        }
+        
+        return GCodeAnalysisResult(
+            filename=file.filename,
+            total_lines=total_lines,
+            print_time_estimate_min=round(total_time_sec / 60, 2),
+            material_used_g=round(material_used_g, 2),
+            layer_count=layer_count,
+            feature_breakdown=feature_breakdown,
+            toolpath_segments=toolpath_segments[:1000],  # Limit to 1000 segments for performance
+            statistics=statistics,
+            warnings=warnings,
+            optimization_suggestions=optimization_suggestions
+        )
+        
+    except Exception as e:
+        print(f"G-code analysis error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to analyze G-code: {str(e)}")
