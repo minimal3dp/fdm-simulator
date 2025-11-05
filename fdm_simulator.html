@@ -1220,10 +1220,11 @@
 
                         <div class="grid grid-cols-2 gap-3 mb-3">
                             <div>
-                                <label for="gcode-material-select" class="block text-xs text-gray-400 mb-1">Material (optional)</label>
-                                <select id="gcode-material-select" class="w-full bg-gray-800 text-gray-200 rounded p-2 text-sm">
-                                    <option value="">-- Use default (PLA) --</option>
-                                </select>
+                                <label class="block text-xs text-gray-400 mb-1">Material</label>
+                                <div class="w-full bg-gray-800 text-gray-200 rounded p-2 text-sm">
+                                    <span>Using Global Material: </span>
+                                    <span id="gcode-material-current" class="text-blue-300">Generic PLA</span>
+                                </div>
                             </div>
                             <div>
                                 <label for="gcode-filament-diameter" class="block text-xs text-gray-400 mb-1">Filament Diameter (mm)</label>
@@ -2853,7 +2854,7 @@
             }
         }
 
-        document.getElementById('analyzeGcodeBtn').addEventListener('click', async () => {
+    document.getElementById('analyzeGcodeBtn').addEventListener('click', async () => {
                 const fileInput = document.getElementById('gcodeAnalysisFile');
                 const file = fileInput.files[0];
             
@@ -2878,9 +2879,9 @@
                     const formData = new FormData();
                     formData.append('file', file);
                     // Optional material/diameter
-                    const matSel = document.getElementById('gcode-material-select');
+                    const globalSel = document.getElementById('global_material_name');
                     const diaInput = document.getElementById('gcode-filament-diameter');
-                    if (matSel && matSel.value) formData.append('material_name', matSel.value);
+                    if (globalSel && globalSel.value) formData.append('material_name', globalSel.value);
                     if (diaInput && diaInput.value) formData.append('filament_diameter_mm', diaInput.value);
             
                     const response = await fetch(`${API_BASE_URL}/analyze_gcode`, {
@@ -2935,26 +2936,15 @@
             });
         })();
 
-        // Populate G-code material select from materials DB when available
-        (function initGcodeMaterialSelect(){
-            const sel = document.getElementById('gcode-material-select');
-            if (!sel) return;
-            const populate = () => {
-                if (!materialsDatabase || Object.keys(materialsDatabase).length === 0) return;
-                // Clear except placeholder
-                sel.querySelectorAll('option:not(:first-child)').forEach(o => o.remove());
-                Object.keys(materialsDatabase).forEach(name => {
-                    const opt = new Option(name, name);
-                    sel.add(opt);
-                });
-                // Default to global material if set
-                const globalSel = document.getElementById('global_material_name');
-                if (globalSel && globalSel.value) sel.value = globalSel.value;
-            };
-            // Try populate now
-            populate();
-            // Populate again when materials finish loading
-            document.addEventListener('materials-loaded', populate);
+        // Keep G-code material display in sync with Global Material
+        (function initGcodeMaterialBinding(){
+            const label = document.getElementById('gcode-material-current');
+            const globalSel = document.getElementById('global_material_name');
+            if (!label || !globalSel) return;
+            const update = () => { label.textContent = globalSel.value || 'Generic PLA'; };
+            update();
+            globalSel.addEventListener('change', update);
+            document.addEventListener('materials-loaded', update);
         })();
 
         // Reset view button
