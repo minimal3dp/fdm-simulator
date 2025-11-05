@@ -809,7 +809,7 @@ async def analyze_gcode(file: UploadFile = File(...)):
         contents = await file.read()
         gcode_text = contents.decode('utf-8')
         
-    # Note: We perform manual G-code parsing; no external parser required
+        # Note: We perform manual G-code parsing; no external parser required
         
         # Split into lines for analysis
         lines = gcode_text.split('\n')
@@ -817,6 +817,7 @@ async def analyze_gcode(file: UploadFile = File(...)):
         
         # Initialize counters and data structures
         layer_count = 0
+        saw_layer_comment = False
         current_z = 0
         material_used_mm = 0  # Filament length in mm
         total_time_sec = 0
@@ -863,6 +864,7 @@ async def analyze_gcode(file: UploadFile = File(...)):
                 
                 # Check for layer changes
                 if ';LAYER:' in line.upper() or 'LAYER_CHANGE' in line.upper():
+                    saw_layer_comment = True
                     layer_count += 1
                 continue
             
@@ -879,6 +881,9 @@ async def analyze_gcode(file: UploadFile = File(...)):
                         y = float(part[1:])
                     elif part.startswith('Z'):
                         z = float(part[1:])
+                        # If slicer doesn't emit ;LAYER comments, derive layer by Z increase
+                        if not saw_layer_comment and z > prev_z:
+                            layer_count += 1
                         if z > current_z:
                             current_z = z
                     elif part.startswith('E'):

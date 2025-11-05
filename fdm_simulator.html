@@ -1342,6 +1342,19 @@
                                 <span class="text-gray-300">Support</span>
                             </div>
                         </div>
+
+                        <!-- Layer Scrubber & Stats -->
+                        <div class="mt-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-sm font-semibold text-white">Layer Scrubber</h3>
+                                <span id="gcode-layer-label" class="text-xs text-gray-400">0 / 0</span>
+                            </div>
+                            <input id="gcode-layer-slider" type="range" min="0" max="0" value="0" class="w-full">
+                            <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-300">
+                                <div>Segments: <span id="gcode-segment-count" class="text-blue-300">0</span></div>
+                                <div class="text-right">FPS: <span id="gcode-fps" class="text-green-300">0</span></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -2533,10 +2546,11 @@
         }
 
             // ===== G-Code Analysis (v9) =====
-        let gcodeScene, gcodeCamera, gcodeRenderer, gcodeControls;
+    let gcodeScene, gcodeCamera, gcodeRenderer, gcodeControls;
         let gcodeContainer, gcodeBounds, gcodeCenter, gcodeMaxDim;
-        let gcodeOriginalSegments = [];
-        let gcodeLayerMax = 0;
+    let gcodeOriginalSegments = [];
+    let gcodeLayerMax = 0;
+    let gcodeLastTime = 0, gcodeFpsEma = 0;
 
             function initGcodeVisualization() {
                 gcodeContainer = document.getElementById('gcodeVisualizationCanvas');
@@ -2598,6 +2612,16 @@
                 if (!gcodeRenderer || !gcodeScene || !gcodeCamera) return;
                 requestAnimationFrame(animateGcode);
                 if (gcodeControls) gcodeControls.update();
+                // FPS
+                const now = performance.now();
+                if (gcodeLastTime) {
+                    const dt = now - gcodeLastTime;
+                    const inst = 1000 / dt;
+                    gcodeFpsEma = gcodeFpsEma * 0.9 + inst * 0.1;
+                    const fpsEl = document.getElementById('gcode-fps');
+                    if (fpsEl) fpsEl.textContent = String(Math.round(gcodeFpsEma));
+                }
+                gcodeLastTime = now;
                 gcodeRenderer.render(gcodeScene, gcodeCamera);
             }
 
@@ -2660,6 +2684,8 @@
                 gcodeMaxDim = Math.max(size.x, size.y, size.z);
                 if (gcodeControls) gcodeControls.target.copy(gcodeCenter);
                 fitCameraToCurrentBounds();
+                const segCountEl = document.getElementById('gcode-segment-count');
+                if (segCountEl) segCountEl.textContent = String(segments.length);
             }
 
             function filterSegmentsUpToLayer(segments, layer) {
