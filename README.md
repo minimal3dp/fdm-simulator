@@ -1,9 +1,15 @@
-FDM 3D Print Property Simulator (v11)
+FDM 3D Print Property Simulator (v12)
 
 This application is a multi-model simulator and optimizer for Fused Deposition Modeling (FDM) 3D printing. It uses a Python (FastAPI) backend to run several machine learning models trained on published research data. The frontend is a single, static HTML file that provides a UI for simulating properties and optimizing parameters.
 
 Recent updates:
-- **v11: NEW - STL Mesh Quality Analysis & G-Code Deviation Detection** (Based on Montalti et al. 2024)
+- **v12: NEW - Parameter Sensitivity Analysis**
+  - Quantify which input parameters have the most impact on outputs
+  - One-at-a-time (OAT) perturbation method for sensitivity scoring
+  - Visual impact bars showing parameter importance rankings
+  - Identify most and least sensitive parameters for informed optimization
+  - Works with all 9 prediction models
+- **v11: STL Mesh Quality Analysis & G-Code Deviation Detection** (Based on Montalti et al. 2024)
   - Analyze STL mesh quality before slicing
   - Detect non-manifold edges, holes, poor tessellation
   - Compare STL vs G-code geometry to quantify slicing errors
@@ -113,7 +119,7 @@ Do not close this terminal. The server is now running.
 
 To use the app: Open the fdm_simulator.html file directly in your web browser (e.g., by double-clicking it).
 
-Application Features (v11)
+Application Features (v12)
 
 1. Simulator Tab
 
@@ -136,6 +142,14 @@ Hardness: Predicts Shore D hardness.
 Multi-Material Bond: Predicts ABS+PETG interface tensile strength.
 
 Composite Filaments: Predicts tensile strength (MPa) and elastic modulus (GPa) for reinforced filaments.
+
+**NEW in v12: Parameter Sensitivity Analysis**
+- Click "Analyze Sensitivity" to quantify parameter impact on outputs
+- Uses one-at-a-time (OAT) perturbation method (±10% variation)
+- See which parameters matter most for your specific configuration
+- Visual impact bars ranked from most to least sensitive
+- Helps prioritize which parameters to optimize or tightly control
+- Works with all 9 models to guide print quality improvements
 
 2. Optimizer Tab
 

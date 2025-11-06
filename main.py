@@ -28,7 +28,7 @@ MATERIALS_FILE = "materials.json"
 FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
 
 # --- FastAPI App Initialization ---
-app = FastAPI(title="FDM 3D Print Property Simulator API (v11 with STL Analysis)")
+app = FastAPI(title="FDM 3D Print Property Simulator API (v12 with Sensitivity Analysis)")
 
 # Configure CORS
 app.add_middleware(
@@ -615,6 +615,172 @@ async def predict_multimaterial(inputs: MultiMaterialInput):
 @app.post("/predict/composite", response_model=CompositeOutput)
 async def predict_composite(inputs: CompositeInput):
     return await _run_prediction("composite", inputs)
+
+
+# --- v12: Sensitivity Analysis Endpoint ---
+
+
+class SensitivityRequest(BaseModel):
+    """Request for sensitivity analysis on a specific model."""
+
+    model_name: str
+    base_inputs: dict[str, Any]  # Baseline parameter values
+    perturbation_percent: float = Field(
+        default=10.0, gt=0, le=50, description="Percentage to perturb each parameter (1-50%)"
+    )
+
+
+class ParameterSensitivity(BaseModel):
+    """Sensitivity metrics for a single parameter."""
+
+    parameter_name: str
+    baseline_value: float | str
+    impact_score: float  # Normalized 0-100, higher = more sensitive
+    output_changes: dict[str, float]  # For each output metric, % change when parameter is perturbed
+    perturbation_range: dict[str, float]  # min/max values tested
+
+
+class SensitivityResult(BaseModel):
+    """Complete sensitivity analysis result."""
+
+    model_name: str
+    baseline_outputs: dict[str, float]
+    parameter_sensitivities: list[ParameterSensitivity]
+    most_sensitive_params: list[str]  # Top 3 most impactful parameters
+    least_sensitive_params: list[str]  # Top 3 least impactful parameters
+
+
+@app.post("/analyze_sensitivity", response_model=SensitivityResult)
+async def analyze_sensitivity(request: SensitivityRequest):
+    """
+    Perform sensitivity analysis to quantify how each input parameter affects outputs.
+    Uses one-at-a-time (OAT) perturbation method.
+    """
+    model_config = MODEL_REGISTRY.get(request.model_name)
+    if not model_config or model_config.get("model") is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Model '{request.model_name}' not loaded or not found.",
+        )
+
+    try:
+        model = model_config["model"]
+        output_names = model_config["output_names"]
+
+        # Get baseline prediction
+        base_features = {
+            k: v
+            for k, v in request.base_inputs.items()
+            if k not in ['part_mass_g', 'filament_cost_kg', 'material_name']
+        }
+        base_df = pd.DataFrame([base_features])
+        base_prediction = model.predict(base_df)[0]
+
+        # Format baseline outputs
+        baseline_outputs = {}
+        if request.model_name == "fea":
+            baseline_outputs = dict(zip(fea_target_names, base_prediction))
+        elif isinstance(base_prediction, (np.ndarray, list)):  # noqa: UP038
+            for i, name in enumerate(output_names):
+                baseline_outputs[name] = float(base_prediction[i])
+        else:
+            baseline_outputs[output_names[0]] = float(base_prediction)
+
+        # Perform sensitivity analysis on each numeric parameter
+        sensitivities = []
+        perturbation_factor = request.perturbation_percent / 100.0
+
+        for param_name, param_value in base_features.items():
+            if not isinstance(param_value, (int, float)):  # noqa: UP038
+                continue  # Skip categorical parameters for now
+
+            # Perturb parameter up and down
+            perturbed_predictions = []
+            perturb_values = []
+
+            for direction in [-1, 1]:
+                perturbed_features = base_features.copy()
+                delta = param_value * perturbation_factor * direction
+                new_value = param_value + delta
+                perturbed_features[param_name] = new_value
+                perturb_values.append(new_value)
+
+                perturbed_df = pd.DataFrame([perturbed_features])
+                pred = model.predict(perturbed_df)[0]
+                perturbed_predictions.append(pred)
+
+            # Calculate output changes
+            output_changes = {}
+            total_impact = 0.0
+
+            # Determine output names based on model type
+            if request.model_name == "fea":
+                active_output_names = fea_target_names
+            elif isinstance(base_prediction, (np.ndarray, list)):  # noqa: UP038
+                active_output_names = output_names
+            else:
+                active_output_names = [output_names[0]]
+
+            for i, output_name in enumerate(active_output_names):
+                if request.model_name == "fea":
+                    base_val = baseline_outputs[output_name]
+                    perturbed_vals = [pred[i] for pred in perturbed_predictions]
+                elif isinstance(base_prediction, (np.ndarray, list)):  # noqa: UP038
+                    base_val = baseline_outputs[output_name]
+                    perturbed_vals = [pred[i] for pred in perturbed_predictions]
+                else:
+                    base_val = baseline_outputs[output_names[0]]
+                    perturbed_vals = perturbed_predictions
+
+                # Calculate average absolute percentage change
+                if base_val != 0:
+                    pct_changes = [
+                        abs((pval - base_val) / base_val * 100) for pval in perturbed_vals
+                    ]
+                    avg_pct_change = np.mean(pct_changes)
+                else:
+                    avg_pct_change = 0.0
+
+                output_changes[output_name] = round(avg_pct_change, 2)
+                total_impact += avg_pct_change
+
+            # Normalize impact score to 0-100
+            impact_score = total_impact / len(output_changes) if output_changes else 0.0
+
+            sensitivities.append(
+                ParameterSensitivity(
+                    parameter_name=param_name,
+                    baseline_value=param_value,
+                    impact_score=round(impact_score, 2),
+                    output_changes=output_changes,
+                    perturbation_range={
+                        "min": round(min(perturb_values), 3),
+                        "max": round(max(perturb_values), 3),
+                    },
+                )
+            )
+
+        # Sort by impact score
+        sensitivities.sort(key=lambda x: x.impact_score, reverse=True)
+
+        # Identify most and least sensitive parameters
+        most_sensitive = [s.parameter_name for s in sensitivities[:3]]
+        least_sensitive = [s.parameter_name for s in sensitivities[-3:]]
+
+        return SensitivityResult(
+            model_name=request.model_name,
+            baseline_outputs=baseline_outputs,
+            parameter_sensitivities=sensitivities,
+            most_sensitive_params=most_sensitive,
+            least_sensitive_params=least_sensitive,
+        )
+
+    except Exception as e:
+        print(f"Sensitivity analysis error: {e}")
+        import traceback
+
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Sensitivity analysis failed: {str(e)}")
 
 
 # --- v4: Optimization Endpoint ---

@@ -1,7 +1,7 @@
 [project]
 name = "fdm-simulator"
-version = "0.11.0"
-description = "An Application to Simulate FDM 3D Printing Outcomes Using Machine Learning Models with STL Mesh Analysis"
+version = "0.12.0"
+description = "An Application to Simulate FDM 3D Printing Outcomes Using Machine Learning Models with Sensitivity Analysis"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

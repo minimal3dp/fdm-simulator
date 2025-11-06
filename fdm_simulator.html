@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FDM 3D Print Property Simulator (v11)</title>
+    <title>FDM 3D Print Property Simulator (v12)</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load three.js for 3D viewer -->
@@ -212,7 +212,7 @@
 
         <!-- Header -->
         <header class="mb-6">
-            <h1 class="text-3xl font-bold text-white">FDM 3D Print Property Simulator (v11)</h1>
+            <h1 class="text-3xl font-bold text-white">FDM 3D Print Property Simulator (v12)</h1>
             <p class="text-lg text-gray-400">Simulate mechanical properties or optimize parameters based on your goals.
             </p>
         </header>
@@ -981,6 +981,50 @@
                             </div>
                         </div>
 
+                    </div>
+
+                    <!-- v12: Sensitivity Analysis Card -->
+                    <div class="simulator-card">
+                        <h2 class="text-xl font-semibold text-white mb-4">Parameter Sensitivity Analysis</h2>
+                        <p class="text-gray-400 text-sm mb-4">Analyze which parameters have the most impact on your outputs.</p>
+
+                        <button id="analyzeSensitivityBtn"
+                            class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg mb-4">
+                            Analyze Sensitivity
+                        </button>
+
+                        <div id="sensitivity-spinner" class="hidden text-center text-gray-400 py-4">
+                            <svg class="animate-spin h-5 w-5 text-purple-500 mx-auto" xmlns="http://www.w3.org/2000/svg"
+                                fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            <p class="mt-2">Analyzing...</p>
+                        </div>
+
+                        <div id="sensitivity-results" class="hidden">
+                            <div class="mb-4">
+                                <h3 class="text-md font-semibold text-purple-400 mb-2">Most Sensitive Parameters</h3>
+                                <div id="most-sensitive-params" class="space-y-2">
+                                    <!-- Will be populated by JS -->
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <h3 class="text-md font-semibold text-gray-400 mb-2">All Parameter Impacts</h3>
+                                <div id="all-sensitivities" class="space-y-2 max-h-96 overflow-y-auto">
+                                    <!-- Will be populated by JS with bars -->
+                                </div>
+                            </div>
+
+                            <div class="text-xs text-gray-500 mt-4">
+                                <p><strong>Impact Score:</strong> Measures how much output changes when parameter is perturbed by 10%.</p>
+                                <p class="mt-1"><strong>Focus on:</strong> Parameters with high impact scores for optimization.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -3250,6 +3294,106 @@
                 recsDiv.classList.remove('hidden');
                 recsList.innerHTML = quality.recommendations.map(r => `<li>${r}</li>`).join('');
             }
+        }
+
+        // --- v12: Sensitivity Analysis ---
+        document.getElementById('analyzeSensitivityBtn').addEventListener('click', async () => {
+            const selectedModel = modelSelector.value;
+            const spinner = document.getElementById('sensitivity-spinner');
+            const resultsPanel = document.getElementById('sensitivity-results');
+
+            // Hide previous results
+            resultsPanel.classList.add('hidden');
+
+            // Show spinner
+            spinner.classList.remove('hidden');
+
+            try {
+                // Get current inputs based on selected model
+                let baseInputs = {};
+                if (selectedModel === 'kaggle') {
+                    baseInputs = getKaggleInputs();
+                } else if (selectedModel === 'c3') {
+                    baseInputs = getC3Inputs();
+                } else if (selectedModel === 'fea') {
+                    baseInputs = getFEAInputs();
+                } else if (selectedModel === 'fatigue') {
+                    baseInputs = getFatigueInputs();
+                } else if (selectedModel === 'accuracy') {
+                    baseInputs = getAccuracyInputs();
+                } else if (selectedModel === 'warpage') {
+                    baseInputs = getWarpageInputs();
+                } else if (selectedModel === 'hardness') {
+                    baseInputs = getHardnessInputs();
+                } else if (selectedModel === 'multimaterial') {
+                    baseInputs = getMultiMaterialInputs();
+                } else if (selectedModel === 'composite') {
+                    baseInputs = getCompositeInputs();
+                }
+
+                const requestBody = {
+                    model_name: selectedModel,
+                    base_inputs: baseInputs,
+                    perturbation_percent: 10.0
+                };
+
+                const response = await fetch(`${API_BASE_URL}/analyze_sensitivity`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `Server error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                displaySensitivityResults(result);
+
+            } catch (error) {
+                console.error('Sensitivity analysis failed:', error);
+                alert(`Sensitivity analysis failed: ${error.message}`);
+            } finally {
+                spinner.classList.add('hidden');
+            }
+        });
+
+        function displaySensitivityResults(result) {
+            const resultsPanel = document.getElementById('sensitivity-results');
+            resultsPanel.classList.remove('hidden');
+
+            // Display most sensitive parameters
+            const mostSensitiveDiv = document.getElementById('most-sensitive-params');
+            mostSensitiveDiv.innerHTML = result.most_sensitive_params
+                .map(param => `<div class="text-purple-300 font-semibold">🔥 ${param}</div>`)
+                .join('');
+
+            // Display all parameter sensitivities with bars
+            const allSensitivitiesDiv = document.getElementById('all-sensitivities');
+            const maxImpact = Math.max(...result.parameter_sensitivities.map(p => p.impact_score), 1);
+
+            allSensitivitiesDiv.innerHTML = result.parameter_sensitivities.map(param => {
+                const barWidth = (param.impact_score / maxImpact) * 100;
+                const colorClass = param.impact_score > 5 ? 'bg-purple-500' :
+                                   param.impact_score > 2 ? 'bg-blue-500' : 'bg-gray-500';
+
+                return `
+                    <div class="mb-3">
+                        <div class="flex justify-between text-xs text-gray-300 mb-1">
+                            <span class="font-medium">${param.parameter_name}</span>
+                            <span class="text-purple-400">${param.impact_score.toFixed(2)}</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2">
+                            <div class="${colorClass} h-2 rounded-full" style="width: ${barWidth}%"></div>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            Baseline: ${typeof param.baseline_value === 'number' ?
+                                param.baseline_value.toFixed(2) : param.baseline_value}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         // --- Initial Run ---
