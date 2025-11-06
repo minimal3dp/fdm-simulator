@@ -1202,13 +1202,13 @@
         <!-- G-Code Analysis Tab Panel (v9) -->
         <div id="panel-gcode" role="tabpanel" class="tab-panel hidden">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
+
                 <!-- Column 1: Upload & Controls -->
                 <div class="lg:col-span-1 space-y-6">
                     <div class="simulator-card">
                         <h2 class="text-xl font-semibold text-white mb-4">Upload G-Code File</h2>
                         <p class="text-gray-400 text-sm mb-4">
-                            Upload your sliced G-code file to analyze toolpaths, estimate print time, 
+                            Upload your sliced G-code file to analyze toolpaths, estimate print time,
                             and receive AI-powered optimization suggestions.
                         </p>
                         <div id="gcode-dropzone" class="border-2 border-dashed border-gray-600 rounded-lg p-4 mb-3 text-gray-400 text-sm hover:border-blue-500 transition-colors">
@@ -1235,7 +1235,7 @@
                             class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
                             Analyze G-Code
                         </button>
-                        
+
                         <div id="gcode-analysis-spinner" class="hidden text-center text-gray-400 mt-4">
                             <svg class="animate-spin h-5 w-5 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg"
                                 fill="none" viewBox="0 0 24 24">
@@ -1247,7 +1247,7 @@
                             </svg>
                             <p class="mt-2">Analyzing G-code...</p>
                         </div>
-                        
+
                         <div id="gcode-error-message"
                             class="hidden text-center text-red-400 p-3 mt-4 bg-red-900 bg-opacity-30 rounded-lg">
                             <p class="font-bold">Analysis Failed</p>
@@ -1286,7 +1286,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="mt-4">
                             <h3 class="text-lg font-semibold text-white mb-2">Feature Breakdown</h3>
                             <div id="gcode-feature-breakdown" class="space-y-2">
@@ -1301,7 +1301,7 @@
                         <ul id="gcode-suggestions-list" class="list-disc list-inside text-gray-300 text-sm space-y-2">
                             <!-- Will be populated by JS -->
                         </ul>
-                        
+
                         <div id="gcode-warnings" class="mt-4 hidden">
                             <h3 class="text-lg font-semibold text-yellow-400 mb-2">⚠️ Warnings</h3>
                             <ul id="gcode-warnings-list" class="list-disc list-inside text-gray-300 text-sm space-y-1">
@@ -1329,12 +1329,12 @@
                                 <span class="text-sm text-gray-300">Compare with loaded G-code (calculate deviation)</span>
                             </label>
                         </div>
-                        
+
                         <button id="analyzeStlBtn"
                             class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">
                             Analyze STL Mesh
                         </button>
-                        
+
                         <div id="stl-analysis-spinner" class="hidden text-center text-gray-400 mt-4">
                             <svg class="animate-spin h-5 w-5 text-purple-500 mx-auto" xmlns="http://www.w3.org/2000/svg"
                                 fill="none" viewBox="0 0 24 24">
@@ -1346,7 +1346,7 @@
                             </svg>
                             <p class="mt-2">Analyzing STL mesh...</p>
                         </div>
-                        
+
                         <div id="stl-error-message"
                             class="hidden text-center text-red-400 p-3 mt-4 bg-red-900 bg-opacity-30 rounded-lg">
                             <p class="font-bold">Analysis Failed</p>
@@ -1357,7 +1357,7 @@
                     <!-- STL Analysis Results -->
                     <div id="stl-results-panel" class="simulator-card hidden">
                         <h2 class="text-xl font-semibold text-white mb-4">Mesh Quality Results</h2>
-                        
+
                         <!-- Quality Score Badge -->
                         <div class="mb-4 text-center">
                             <div class="inline-block">
@@ -1432,7 +1432,7 @@
                             <ul id="stl-warnings-list" class="list-disc list-inside text-xs text-gray-300 space-y-1">
                             </ul>
                         </div>
-                        
+
                         <div id="stl-recommendations" class="mt-4 hidden">
                             <h3 class="text-sm font-semibold text-green-400 mb-2">💡 Recommendations</h3>
                             <ul id="stl-recommendations-list" class="list-disc list-inside text-xs text-gray-300 space-y-1">
@@ -1456,7 +1456,7 @@
                         </div>
                         <div id="gcodeVisualizationCanvas" style="width: 100%; height: 500px; border-radius: 0.5rem; background-color: #1f2937;">
                         </div>
-                        
+
                         <!-- Legend -->
                         <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
                             <label class="flex items-center space-x-2 cursor-pointer">
@@ -2713,31 +2713,31 @@
             function initGcodeVisualization() {
                 gcodeContainer = document.getElementById('gcodeVisualizationCanvas');
                 if (!gcodeContainer || gcodeScene) return; // Already initialized
-            
+
                 gcodeScene = new THREE.Scene();
                 gcodeScene.background = new THREE.Color(0x1f2937);
-            
+
                 gcodeCamera = new THREE.PerspectiveCamera(45, gcodeContainer.clientWidth / gcodeContainer.clientHeight, 0.1, 2000);
                 gcodeCamera.position.set(100, 100, 100);
                 gcodeCamera.lookAt(0, 0, 0);
-            
+
                 gcodeRenderer = new THREE.WebGLRenderer({ antialias: true });
                 gcodeRenderer.setSize(gcodeContainer.clientWidth, gcodeContainer.clientHeight);
                 gcodeContainer.appendChild(gcodeRenderer.domElement);
-            
+
                 const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
                 gcodeScene.add(ambientLight);
-            
+
                 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
                 directionalLight.position.set(10, 10, 5);
                 gcodeScene.add(directionalLight);
-            
+
                 const gridHelper = new THREE.GridHelper(200, 20);
                 gcodeScene.add(gridHelper);
-            
+
                 const axesHelper = new THREE.AxesHelper(50);
                 gcodeScene.add(axesHelper);
-            
+
                 // Orbit controls
                 if (THREE.OrbitControls) {
                     gcodeControls = new THREE.OrbitControls(gcodeCamera, gcodeRenderer.domElement);
@@ -2809,9 +2809,9 @@
                     'support': 0xec4899,       // pink
                     'unknown': 0x6b7280        // gray
                 };
-            
+
                 if (!segments || segments.length === 0) return;
-            
+
                 // Store bounds and fit camera
                 const allPoints = segments.map(seg => new THREE.Vector3(seg.x, seg.z, seg.y));
                 gcodeBounds = new THREE.Box3().setFromPoints(allPoints);
@@ -2906,7 +2906,7 @@
             document.getElementById('gcode-material').textContent = result.material_used_g.toFixed(2);
             document.getElementById('gcode-layers').textContent = result.layer_count;
             document.getElementById('gcode-lines').textContent = result.total_lines;
-            
+
             // Setup scrubber
             gcodeOriginalSegments = result.toolpath_segments || [];
             gcodeLayerMax = result.layer_count || 0;
@@ -2924,7 +2924,7 @@
                 const segCountEl = document.getElementById('gcode-segment-count');
                 if (segCountEl) segCountEl.textContent = String(count);
             };
-            
+
             // Feature breakdown
             const breakdownDiv = document.getElementById('gcode-feature-breakdown');
             let breakdownHtml = '';
@@ -2952,7 +2952,7 @@
                 `;
             });
             breakdownDiv.innerHTML = breakdownHtml;
-            
+
             // Optimization suggestions
             const suggestionsPanel = document.getElementById('gcode-suggestions-panel');
             suggestionsPanel.classList.remove('hidden');
@@ -2962,7 +2962,7 @@
                 suggestionsHtml += `<li class="text-green-300">${suggestion}</li>`;
             });
             suggestionsList.innerHTML = suggestionsHtml || '<li class="text-gray-500">No suggestions available.</li>';
-            
+
             // Warnings
             const warningsDiv = document.getElementById('gcode-warnings');
             if (result.warnings && result.warnings.length > 0) {
@@ -2976,7 +2976,7 @@
             } else {
                 warningsDiv.classList.add('hidden');
             }
-            
+
             // Render toolpaths (build all layers, then show all)
             if (gcodeOriginalSegments.length > 0) {
                 renderToolpaths(gcodeOriginalSegments);
@@ -2987,24 +2987,24 @@
     document.getElementById('analyzeGcodeBtn').addEventListener('click', async () => {
                 const fileInput = document.getElementById('gcodeAnalysisFile');
                 const file = fileInput.files[0];
-            
+
                 if (!file) {
                     alert('Please select a G-code file first.');
                     return;
                 }
-            
+
                 const spinner = document.getElementById('gcode-analysis-spinner');
                 const errorDiv = document.getElementById('gcode-error-message');
                 const errorText = document.getElementById('gcode-error-text');
-            
+
                 // Hide previous results and errors
                 document.getElementById('gcode-stats-panel').classList.add('hidden');
                 document.getElementById('gcode-suggestions-panel').classList.add('hidden');
                 errorDiv.classList.add('hidden');
-            
+
                 // Show spinner
                 spinner.classList.remove('hidden');
-            
+
                 try {
                     const formData = new FormData();
                     formData.append('file', file);
@@ -3013,20 +3013,20 @@
                     const diaInput = document.getElementById('gcode-filament-diameter');
                     if (globalSel && globalSel.value) formData.append('material_name', globalSel.value);
                     if (diaInput && diaInput.value) formData.append('filament_diameter_mm', diaInput.value);
-            
+
                     const response = await fetch(`${API_BASE_URL}/analyze_gcode`, {
                         method: 'POST',
                         body: formData
                     });
-                
+
                     if (!response.ok) {
                         const errorData = await response.json();
                         throw new Error(errorData.detail || `Server error: ${response.status}`);
                     }
-                
+
                     const result = await response.json();
                     displayGCodeAnalysis(result);
-                
+
                 } catch (error) {
                     console.error('G-Code analysis failed:', error);
                     errorText.textContent = error.message || 'Unknown error occurred.';
@@ -3103,7 +3103,7 @@
         })();
 
         // ===== v11: STL Mesh Analysis =====
-        
+
         // STL dropzone handlers
         (function initStlDropzone(){
             const drop = document.getElementById('stl-dropzone');
@@ -3138,28 +3138,28 @@
         document.getElementById('analyzeStlBtn').addEventListener('click', async () => {
             const fileInput = document.getElementById('stlAnalysisFile');
             const file = fileInput.files[0];
-            
+
             if (!file) {
                 alert('Please select an STL file first.');
                 return;
             }
-            
+
             const spinner = document.getElementById('stl-analysis-spinner');
             const errorDiv = document.getElementById('stl-error-message');
             const errorText = document.getElementById('stl-error-text');
             const resultsPanel = document.getElementById('stl-results-panel');
-            
+
             // Hide previous results and errors
             resultsPanel.classList.add('hidden');
             errorDiv.classList.add('hidden');
-            
+
             // Show spinner
             spinner.classList.remove('hidden');
-            
+
             try {
                 const formData = new FormData();
                 formData.append('file', file);
-                
+
                 // Check if comparing with G-code
                 const compareCheckbox = document.getElementById('compare-with-gcode');
                 if (compareCheckbox && compareCheckbox.checked) {
@@ -3168,20 +3168,20 @@
                         formData.append('compare_gcode', gcodeInput.files[0]);
                     }
                 }
-                
+
                 const response = await fetch(`${API_BASE_URL}/analyze_stl`, {
                     method: 'POST',
                     body: formData
                 });
-            
+
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.detail || `Server error: ${response.status}`);
                 }
-            
+
                 const result = await response.json();
                 displayStlAnalysis(result);
-            
+
             } catch (error) {
                 console.error('STL analysis failed:', error);
                 errorText.textContent = error.message || 'Unknown error occurred.';
@@ -3194,9 +3194,9 @@
         function displayStlAnalysis(result) {
             const resultsPanel = document.getElementById('stl-results-panel');
             resultsPanel.classList.remove('hidden');
-            
+
             const quality = result.mesh_quality;
-            
+
             // Quality score with color
             const scoreEl = document.getElementById('stl-quality-score');
             scoreEl.textContent = quality.mesh_quality_score;
@@ -3207,34 +3207,34 @@
             } else {
                 scoreEl.style.color = '#ef4444'; // red
             }
-            
+
             // Basic stats
             document.getElementById('stl-vertices').textContent = quality.vertex_count.toLocaleString();
             document.getElementById('stl-faces').textContent = quality.face_count.toLocaleString();
             document.getElementById('stl-volume').textContent = `${quality.volume_cm3.toFixed(2)} cm³`;
             document.getElementById('stl-area').textContent = `${quality.surface_area_cm2.toFixed(2)} cm²`;
-            
+
             // Quality indicators
             document.getElementById('stl-watertight').textContent = quality.is_watertight ? '✅ Yes' : '❌ No';
             document.getElementById('stl-watertight').style.color = quality.is_watertight ? '#10b981' : '#ef4444';
-            
+
             document.getElementById('stl-manifold').textContent = quality.is_manifold ? '✅ Yes' : '❌ No';
             document.getElementById('stl-manifold').style.color = quality.is_manifold ? '#10b981' : '#ef4444';
-            
+
             document.getElementById('stl-tri-quality').textContent = quality.triangle_quality_mean.toFixed(3);
             document.getElementById('stl-aspect-ratio').textContent = quality.aspect_ratio_max.toFixed(2);
-            
+
             // G-code comparison
             if (result.gcode_comparison) {
                 const comp = result.gcode_comparison;
                 const compDiv = document.getElementById('stl-gcode-comparison');
                 compDiv.classList.remove('hidden');
-                
+
                 document.getElementById('stl-hausdorff').textContent = `${comp.hausdorff_distance_mm.toFixed(3)} mm`;
                 document.getElementById('stl-mean-dev').textContent = `${comp.mean_deviation_mm.toFixed(3)} mm`;
                 document.getElementById('stl-accuracy').textContent = `${comp.overall_accuracy_percent.toFixed(1)}%`;
             }
-            
+
             // Warnings
             if (quality.warnings && quality.warnings.length > 0) {
                 const warningsDiv = document.getElementById('stl-warnings');
@@ -3242,7 +3242,7 @@
                 warningsDiv.classList.remove('hidden');
                 warningsList.innerHTML = quality.warnings.map(w => `<li>${w}</li>`).join('');
             }
-            
+
             // Recommendations
             if (quality.recommendations && quality.recommendations.length > 0) {
                 const recsDiv = document.getElementById('stl-recommendations');

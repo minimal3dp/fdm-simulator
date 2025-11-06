@@ -171,7 +171,7 @@ Upload your sliced G-code file to get:
   - Adjust slicer resolution settings
 
 **Research Foundation:**
-Based on Montalti et al. (2024) "From CAD to G-code: Strategies to minimizing errors in 3D printing process" 
+Based on Montalti et al. (2024) "From CAD to G-code: Strategies to minimizing errors in 3D printing process"
 (CIRP Journal of Manufacturing Science and Technology)
 
 4. Global Settings
@@ -181,3 +181,60 @@ Filament Used (g): Enter the part weight from your slicer.
 Filament Cost ($/kg): Enter your spool cost.
 
 All simulation and optimization results will automatically include Estimated Cost and Estimated Print Time.
+
+## Developer guide
+
+### Linting & formatting (ruff) with pre-commit
+
+This repo includes a pre-commit configuration for ruff (lint + format) and basic hygiene checks.
+
+1) Install pre-commit and ruff locally (inside your virtualenv):
+
+```
+pip install pre-commit ruff
+```
+
+2) Install the git hooks for this repo:
+
+```
+pre-commit install
+```
+
+3) Optionally run on all files once:
+
+```
+pre-commit run --all-files
+```
+
+Ruff is also run in CI to keep the codebase consistent.
+
+### Running tests (pytest)
+
+We use pytest with FastAPI's TestClient. To run locally:
+
+```
+pip install pytest
+pytest -q
+```
+
+Tests are executed in GitHub Actions on every push/PR targeting `main` (and branch `version11`).
+
+## Upload limits and environment variables (v11)
+
+The STL analysis endpoint `/analyze_stl` enforces upload and complexity limits that can be tuned via environment variables:
+
+- `MAX_STL_MB` (default: `20`)
+  - Maximum allowed STL upload size in megabytes. Requests exceeding this are rejected with HTTP 413 and a JSON error (`code: FILE_TOO_LARGE`).
+
+- `MAX_STL_TRIANGLES` (default: `1000000`)
+  - Maximum allowed triangle count after parsing the STL. Over-limit meshes are rejected with HTTP 413 (`code: MESH_TOO_COMPLEX`).
+
+Set these before starting the server or in your shell when running tests, for example:
+
+```
+export MAX_STL_MB=10
+export MAX_STL_TRIANGLES=200000
+uvicorn main:app --reload
+```
+
+Both limits are read per-request, so test cases can override them using environment variables without server restarts.
