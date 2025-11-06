@@ -1,0 +1,96 @@
+{
+  "PLA": {
+    "common": {
+      "nozzle_temperature": 210,
+      "bed_temperature": 60,
+      "print_speed": 60,
+      "fan_speed": 100
+    },
+    "fea": {
+      "Material_Youngs_Modulus_GPa": 3.5,
+      "Material_Tensile_Yield_Strenght_MPa": 50,
+      "Material_Poissons_Ratio": 0.36
+    },
+    "fatigue": {
+      "Nozzle_Temperature": 210,
+      "Print_Speed": 10,
+      "Nozzle_Diameter": 0.4
+    },
+    "density_g_cm3": 1.24
+  },
+  "ABS": {
+    "common": {
+      "nozzle_temperature": 235,
+      "bed_temperature": 95,
+      "print_speed": 60,
+      "fan_speed": 0
+    },
+    "fea": {
+      "Material_Youngs_Modulus_GPa": 2.2,
+      "Material_Tensile_Yield_Strenght_MPa": 35,
+      "Material_Poissons_Ratio": 0.35
+    },
+    "fatigue": null,
+    "density_g_cm3": 1.04
+  },
+  "PETG": {
+    "common": {
+      "nozzle_temperature": 240,
+      "bed_temperature": 75,
+      "print_speed": 50,
+      "fan_speed": 50
+    },
+    "fea": {
+      "Material_Youngs_Modulus_GPa": 2.1,
+      "Material_Tensile_Yield_Strenght_MPa": 45,
+      "Material_Poissons_Ratio": 0.37
+    },
+    "fatigue": null,
+    "density_g_cm3": 1.27
+  },
+  "Nylon": {
+    "common": {
+      "nozzle_temperature": 250,
+      "bed_temperature": 80,
+      "print_speed": 40,
+      "fan_speed": 20
+    },
+    "fea": {
+      "Material_Youngs_Modulus_GPa": 1.7,
+      "Material_Tensile_Yield_Strenght_MPa": 60,
+      "Material_Poissons_Ratio": 0.4
+    },
+    "fatigue": null,
+    "density_g_cm3": 1.14
+  },
+  "PC (Polycarbonate)": {
+    "common": {
+      "nozzle_temperature": 280,
+      "bed_temperature": 110,
+      "print_speed": 30,
+      "fan_speed": 0
+    },
+    "fea": {
+      "Material_Youngs_Modulus_GPa": 2.4,
+      "Material_Tensile_Yield_Strenght_MPa": 65,
+      "Material_Poissons_Ratio": 0.38
+    },
+    "fatigue": null,
+    "density_g_cm3": 1.2
+  },
+  "TPU (Flexible)": {
+    "common": {
+      "nozzle_temperature": 225,
+      "bed_temperature": 50,
+      "print_speed": 20,
+      "fan_speed": 100
+    },
+    "fea": {
+      "Material_Youngs_Modulus_GPa": 0.1,
+      "Material_Tensile_Yield_Strenght_MPa": 30,
+      "Material_Poissons_Ratio": 0.49
+    },
+    "fatigue": null,
+    "density_g_cm3": 1.21
+  }
+}

@@ -1,0 +1,34 @@
+Col_0,Col_1,d,Value,Value,"n (Z vs.
+XY)",Col_6
+ABS,"Tensile
+Strength","ASTM
+D638",30.8 MPa,27.5 MPa,-10.7%,9
+PC,"Tensile
+Strength","ASTM
+D638",57 MPa,42 MPa,-26.3%,9
+"ULTEM
+9085","Tensile
+Strength","ASTM
+D638","76.2 MPa
+(XZ)","54.2 MPa
+(ZX)",-28.9%,19
+"Nylon
+12CF","Tensile
+Strength","ASTM
+D638","77.5 MPa
+(XZ)","38.3 MPa
+(ZX)",-50.6%,1
+ABS,"Elongatio
+n at
+Break","ASTM
+D638",8.1%,1.8%,-77.8%,9
+PC,"Elongatio
+n at
+Break","ASTM
+D638",4.8%,2.5%,-47.9%,9
+"ULTEM
+9085","Izod
+Impact
+(Notched
+)","ASTM
+D256",88.5 J/m,39.2 J/m,-55.7%,21

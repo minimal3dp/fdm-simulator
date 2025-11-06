@@ -514,6 +514,165 @@ async def get_materials():
     return materials_database
 
 
+# --- Materials Recommendation ---
+
+
+class MaterialRecommendRequest(BaseModel):
+    # Hard constraints (optional)
+    min_strength_mpa: float | None = None
+    min_temp_resistance_c: float | None = None  # prefers HDT_C, falls back to Tg_C
+    max_cost_usd_per_kg: float | None = None
+    include_variants: bool = True
+
+    # Weights (optional)
+    weight_strength: float = 0.4
+    weight_temp: float = 0.3
+    weight_cost: float = 0.2
+    weight_density: float = 0.1
+
+    top_k: int = 5
+
+
+def _get_material_metric(
+    material: dict, key_path: list[str], default: float | None = None
+) -> float | None:
+    cur: dict | None = material
+    for k in key_path:
+        if not isinstance(cur, dict) or k not in cur:
+            return default
+        cur = cur[k]
+    if isinstance(cur, int | float):
+        return float(cur)
+    return default
+
+
+@app.post("/materials/recommend")
+async def recommend_materials(req: MaterialRecommendRequest):
+    if not materials_database:
+        raise HTTPException(status_code=404, detail="Materials database is not loaded.")
+
+    # Collect candidate rows with extracted metrics
+    rows = []
+    for name, mat in materials_database.items():
+        if not isinstance(mat, dict):
+            continue
+        # Metrics (gracefully missing)
+        strength = _get_material_metric(
+            mat,
+            ["fea", "Material_Tensile_Yield_Strenght_MPa"],
+        ) or _get_material_metric(
+            mat,
+            ["strength", "tensile_ultimate_MPa"],
+        )
+        temp_hdt = _get_material_metric(mat, ["thermal", "HDT_C"])  # prefer HDT
+        temp_tg = _get_material_metric(mat, ["thermal", "Tg_C"])  # fallback
+        temp_res = temp_hdt if temp_hdt is not None else temp_tg
+        cost = _get_material_metric(mat, ["economics", "cost_usd_per_kg"])  # may be None
+        density = _get_material_metric(mat, ["density_g_cm3"], None) or _get_material_metric(
+            mat, ["common", "density_g_cm3"], None
+        )
+
+        # Hard constraint filter
+        if req.min_strength_mpa is not None and (
+            strength is None or strength < req.min_strength_mpa
+        ):
+            continue
+        if req.min_temp_resistance_c is not None and (
+            temp_res is None or temp_res < req.min_temp_resistance_c
+        ):
+            continue
+        if req.max_cost_usd_per_kg is not None and (cost is None or cost > req.max_cost_usd_per_kg):
+            continue
+
+        rows.append(
+            {
+                "name": name,
+                "material": mat,
+                "strength": strength,
+                "temp": temp_res,
+                "cost": cost,
+                "density": density,
+                "missing": [
+                    key
+                    for key, val in {
+                        "HDT_C_or_Tg_C": temp_res,
+                        "cost_usd_per_kg": cost,
+                    }.items()
+                    if val is None
+                ],
+            }
+        )
+
+    if not rows:
+        return {"materials": [], "notes": ["No materials matched constraints"]}
+
+    # Normalization helpers (ignore None)
+    def normalize(vals: list[float | None], invert: bool = False) -> list[float | None]:
+        real = [v for v in vals if v is not None]
+        if not real:
+            return [None for _ in vals]
+        mn, mx = min(real), max(real)
+        if mx == mn:
+            return [1.0 if v is not None else None for v in vals]
+
+        def scale(v: float | None) -> float | None:
+            if v is None:
+                return None
+            s = (v - mn) / (mx - mn)
+            return (1 - s) if invert else s
+
+        return [scale(v) for v in vals]
+
+    s_norm = normalize([r["strength"] for r in rows])
+    t_norm = normalize([r["temp"] for r in rows])
+    c_norm = normalize([r["cost"] for r in rows], invert=True)
+    # Prefer lower density only if present — normalize then invert for "lighter is better"
+    d_norm = normalize([r["density"] for r in rows], invert=True)
+
+    # Score with weight rebalancing for missing metrics per-material
+    out = []
+    for idx, r in enumerate(rows):
+        parts = []
+        weights = []
+        if s_norm[idx] is not None:
+            parts.append(float(s_norm[idx]) * req.weight_strength)
+            weights.append(req.weight_strength)
+        if t_norm[idx] is not None:
+            parts.append(float(t_norm[idx]) * req.weight_temp)
+            weights.append(req.weight_temp)
+        if c_norm[idx] is not None:
+            parts.append(float(c_norm[idx]) * req.weight_cost)
+            weights.append(req.weight_cost)
+        if d_norm[idx] is not None:
+            parts.append(float(d_norm[idx]) * req.weight_density)
+            weights.append(req.weight_density)
+        score = (sum(parts) / sum(weights)) if weights else 0.0
+        out.append(
+            {
+                "name": r["name"],
+                "score": round(float(score), 4),
+                "matched_constraints": True,
+                "missing_fields": r["missing"],
+                "summary": {
+                    "tensile_yield_mpa": r["strength"],
+                    "temp_resistance_c": r["temp"],
+                    "cost_usd_per_kg": r["cost"],
+                    "density_g_cm3": r["density"],
+                    "common": r["material"].get("common", {}),
+                },
+            }
+        )
+
+    out.sort(key=lambda x: x["score"], reverse=True)
+    return {
+        "materials": out[: max(1, req.top_k)],
+        "notes": [
+            "Temp resistance prefers HDT_C and falls back to Tg_C if HDT_C is missing",
+            "Scores normalized and reweighted if metrics are missing",
+        ],
+    }
+
+
 # --- v8: Refactored Generic Prediction Logic ---
 
 

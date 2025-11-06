@@ -1,0 +1,25 @@
+Material,"Tensile
+Strength
+(MPa)","Tensile
+Modulus
+(MPa)","Elongati
+on at
+Break
+(%)","HDT /
+Max
+Service
+Temp
+(°C)","Impact
+Strength
+(kJ/m²)","Density
+(g/cm³)"
+PLA,55 - 75,"2100 -
+3600",2 - 12,52 - 60,4 - 9,1.21 - 1.25
+PETG,45 - 53,"1675 -
+2150",25 - 130,69 - 80,7 - 14,1.23 - 1.27
+ABS,40 - 46,"1800 -
+2400",10 - 25,87 - 100,10 - 39,"1.04 -
+1.05"
+ASA,44 - 55,"1900 -
+2400",10 - 25,90 - 100,41,"1.05 -
+1.07"

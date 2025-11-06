@@ -16,7 +16,15 @@
       "Print_Speed": 10,
       "Nozzle_Diameter": 0.4
     },
-    "density_g_cm3": 1.24
+    "density_g_cm3": 1.24,
+    "properties": {
+      "tensile_strength_MPa": 65.0,
+      "tensile_modulus_MPa": 2850.0,
+      "elongation_at_break_pct": 7.0,
+      "HDT_C": 56.0,
+      "impact_strength_kJ_m2": 6.5,
+      "density_g_cm3": 1.23
+    }
   },
   "ABS": {
     "common": {
@@ -31,7 +39,15 @@
       "Material_Poissons_Ratio": 0.35
     },
     "fatigue": null,
-    "density_g_cm3": 1.04
+    "density_g_cm3": 1.04,
+    "properties": {
+      "tensile_strength_MPa": 43.0,
+      "tensile_modulus_MPa": 2100.0,
+      "elongation_at_break_pct": 17.5,
+      "HDT_C": 93.5,
+      "impact_strength_kJ_m2": 24.5,
+      "density_g_cm3": 1.045
+    }
   },
   "PETG": {
     "common": {
@@ -46,7 +62,15 @@
       "Material_Poissons_Ratio": 0.37
     },
     "fatigue": null,
-    "density_g_cm3": 1.27
+    "density_g_cm3": 1.27,
+    "properties": {
+      "tensile_strength_MPa": 49.0,
+      "tensile_modulus_MPa": 1912.5,
+      "elongation_at_break_pct": 77.5,
+      "HDT_C": 74.5,
+      "impact_strength_kJ_m2": 10.5,
+      "density_g_cm3": 1.25
+    }
   },
   "Nylon": {
     "common": {
@@ -58,7 +82,7 @@
     "fea": {
       "Material_Youngs_Modulus_GPa": 1.7,
       "Material_Tensile_Yield_Strenght_MPa": 60,
-      "Material_Poissons_Ratio": 0.40
+      "Material_Poissons_Ratio": 0.4
     },
     "fatigue": null,
     "density_g_cm3": 1.14
@@ -76,7 +100,7 @@
       "Material_Poissons_Ratio": 0.38
     },
     "fatigue": null,
-    "density_g_cm3": 1.20
+    "density_g_cm3": 1.2
   },
   "TPU (Flexible)": {
     "common": {
@@ -92,5 +116,97 @@
     },
     "fatigue": null,
     "density_g_cm3": 1.21
+  },
+  "ASA": {
+    "common": {
+      "nozzle_temperature": null,
+      "bed_temperature": null,
+      "print_speed": null,
+      "fan_speed": null
+    },
+    "properties": {
+      "tensile_strength_MPa": 49.5,
+      "tensile_modulus_MPa": 2150.0,
+      "elongation_at_break_pct": 17.5,
+      "HDT_C": 95.0,
+      "impact_strength_kJ_m2": 41.0,
+      "density_g_cm3": 1.06
+    }
+  },
+  "PEI__ULTEM_9085": {
+    "common": {
+      "nozzle_temperature": null,
+      "bed_temperature": null,
+      "print_speed": null,
+      "fan_speed": null
+    },
+    "properties": {
+      "tensile_strength_MPa": 66.0,
+      "tensile_modulus_MPa": 2465.0,
+      "elongation_at_break_pct": 3.6500000000000004,
+      "HDT_C": 165.0,
+      "Tg_C": 177.0,
+      "density_g_cm3": 1.27
+    }
+  },
+  "PEKK": {
+    "common": {
+      "nozzle_temperature": null,
+      "bed_temperature": null,
+      "print_speed": null,
+      "fan_speed": null
+    },
+    "properties": {
+      "tensile_strength_MPa": 105.0,
+      "tensile_modulus_MPa": 3205.0,
+      "elongation_at_break_pct": 9.5,
+      "HDT_C": 247.0,
+      "Tg_C": 162.0,
+      "density_g_cm3": 1.28
+    }
+  },
+  "PEEK": {
+    "common": {
+      "nozzle_temperature": null,
+      "bed_temperature": null,
+      "print_speed": null,
+      "fan_speed": null
+    },
+    "properties": {
+      "tensile_strength_MPa": 101.0,
+      "tensile_modulus_MPa": 3720.0,
+      "elongation_at_break_pct": 27.0,
+      "HDT_C": 216.5,
+      "Tg_C": 143.0,
+      "density_g_cm3": 1.31
+    }
+  },
+  "TPE__E_G___85A": {
+    "common": {
+      "nozzle_temperature": null,
+      "bed_temperature": null,
+      "print_speed": null,
+      "fan_speed": null
+    },
+    "properties": {
+      "shore_hardness": "85A",
+      "tensile_strength_MPa": 8.0,
+      "elongation_at_break_pct": 350.0,
+      "density_g_cm3": 1.0
+    }
+  },
+  "TPU__E_G___95A": {
+    "common": {
+      "nozzle_temperature": null,
+      "bed_temperature": null,
+      "print_speed": null,
+      "fan_speed": null
+    },
+    "properties": {
+      "shore_hardness": "95A",
+      "tensile_strength_MPa": 34.5,
+      "elongation_at_break_pct": 450.0,
+      "density_g_cm3": 1.21
+    }
   }
 }
