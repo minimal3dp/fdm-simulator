@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FDM 3D Print Property Simulator (v8)</title>
+    <title>FDM 3D Print Property Simulator (v11)</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load three.js for 3D viewer -->
@@ -212,7 +212,7 @@
 
         <!-- Header -->
         <header class="mb-6">
-            <h1 class="text-3xl font-bold text-white">FDM 3D Print Property Simulator (v8)</h1>
+            <h1 class="text-3xl font-bold text-white">FDM 3D Print Property Simulator (v11)</h1>
             <p class="text-lg text-gray-400">Simulate mechanical properties or optimize parameters based on your goals.
             </p>
         </header>
@@ -1306,6 +1306,136 @@
                             <h3 class="text-lg font-semibold text-yellow-400 mb-2">⚠️ Warnings</h3>
                             <ul id="gcode-warnings-list" class="list-disc list-inside text-gray-300 text-sm space-y-1">
                                 <!-- Will be populated by JS -->
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- v11: STL Mesh Quality Analysis -->
+                    <div class="simulator-card">
+                        <h2 class="text-xl font-semibold text-white mb-4">STL Mesh Quality Analysis</h2>
+                        <p class="text-gray-400 text-sm mb-4">
+                            Upload an STL file to analyze mesh quality and detect potential slicing issues before printing.
+                        </p>
+                        <div id="stl-dropzone" class="border-2 border-dashed border-gray-600 rounded-lg p-4 mb-3 text-gray-400 text-sm hover:border-blue-500 transition-colors">
+                            <p class="mb-2">Drag & drop your .stl here, or click to select.</p>
+                            <input type="file" id="stlAnalysisFile" accept=".stl" class="hidden" />
+                            <button id="stlSelectBtn" class="mt-2 bg-gray-700 hover:bg-gray-600 text-white text-xs py-1 px-3 rounded">Choose STL File</button>
+                            <div id="stl-file-meta" class="mt-2 text-xs text-gray-500"></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="compare-with-gcode" class="form-checkbox h-4 w-4 text-blue-600" />
+                                <span class="text-sm text-gray-300">Compare with loaded G-code (calculate deviation)</span>
+                            </label>
+                        </div>
+                        
+                        <button id="analyzeStlBtn"
+                            class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg">
+                            Analyze STL Mesh
+                        </button>
+                        
+                        <div id="stl-analysis-spinner" class="hidden text-center text-gray-400 mt-4">
+                            <svg class="animate-spin h-5 w-5 text-purple-500 mx-auto" xmlns="http://www.w3.org/2000/svg"
+                                fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            <p class="mt-2">Analyzing STL mesh...</p>
+                        </div>
+                        
+                        <div id="stl-error-message"
+                            class="hidden text-center text-red-400 p-3 mt-4 bg-red-900 bg-opacity-30 rounded-lg">
+                            <p class="font-bold">Analysis Failed</p>
+                            <p id="stl-error-text" class="text-sm">Error details here.</p>
+                        </div>
+                    </div>
+
+                    <!-- STL Analysis Results -->
+                    <div id="stl-results-panel" class="simulator-card hidden">
+                        <h2 class="text-xl font-semibold text-white mb-4">Mesh Quality Results</h2>
+                        
+                        <!-- Quality Score Badge -->
+                        <div class="mb-4 text-center">
+                            <div class="inline-block">
+                                <div class="text-sm text-gray-400 mb-1">Overall Quality Score</div>
+                                <div id="stl-quality-score" class="text-5xl font-bold" style="color: #10b981;">95</div>
+                                <div class="text-sm text-gray-400">/ 100</div>
+                            </div>
+                        </div>
+
+                        <!-- Mesh Statistics -->
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div class="bg-gray-800 rounded p-3">
+                                <div class="text-xs text-gray-400">Vertices</div>
+                                <div id="stl-vertices" class="text-lg font-semibold text-white">-</div>
+                            </div>
+                            <div class="bg-gray-800 rounded p-3">
+                                <div class="text-xs text-gray-400">Faces</div>
+                                <div id="stl-faces" class="text-lg font-semibold text-white">-</div>
+                            </div>
+                            <div class="bg-gray-800 rounded p-3">
+                                <div class="text-xs text-gray-400">Volume</div>
+                                <div id="stl-volume" class="text-lg font-semibold text-white">-</div>
+                            </div>
+                            <div class="bg-gray-800 rounded p-3">
+                                <div class="text-xs text-gray-400">Surface Area</div>
+                                <div id="stl-area" class="text-lg font-semibold text-white">-</div>
+                            </div>
+                        </div>
+
+                        <!-- Quality Indicators -->
+                        <div class="space-y-2 mb-4">
+                            <div class="flex items-center justify-between bg-gray-800 rounded p-2">
+                                <span class="text-sm text-gray-300">Watertight</span>
+                                <span id="stl-watertight" class="text-sm font-semibold">-</span>
+                            </div>
+                            <div class="flex items-center justify-between bg-gray-800 rounded p-2">
+                                <span class="text-sm text-gray-300">Manifold</span>
+                                <span id="stl-manifold" class="text-sm font-semibold">-</span>
+                            </div>
+                            <div class="flex items-center justify-between bg-gray-800 rounded p-2">
+                                <span class="text-sm text-gray-300">Triangle Quality (mean)</span>
+                                <span id="stl-tri-quality" class="text-sm font-semibold">-</span>
+                            </div>
+                            <div class="flex items-center justify-between bg-gray-800 rounded p-2">
+                                <span class="text-sm text-gray-300">Aspect Ratio (max)</span>
+                                <span id="stl-aspect-ratio" class="text-sm font-semibold">-</span>
+                            </div>
+                        </div>
+
+                        <!-- G-code Comparison (if available) -->
+                        <div id="stl-gcode-comparison" class="hidden mt-4 p-3 bg-blue-900 bg-opacity-30 rounded">
+                            <h3 class="text-sm font-semibold text-blue-300 mb-2">G-code Deviation Analysis</h3>
+                            <div class="space-y-1 text-sm text-gray-300">
+                                <div class="flex justify-between">
+                                    <span>Max Deviation:</span>
+                                    <span id="stl-hausdorff" class="font-semibold">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Mean Deviation:</span>
+                                    <span id="stl-mean-dev" class="font-semibold">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Accuracy:</span>
+                                    <span id="stl-accuracy" class="font-semibold">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Warnings and Recommendations -->
+                        <div id="stl-warnings" class="mt-4 hidden">
+                            <h3 class="text-sm font-semibold text-yellow-400 mb-2">⚠️ Warnings</h3>
+                            <ul id="stl-warnings-list" class="list-disc list-inside text-xs text-gray-300 space-y-1">
+                            </ul>
+                        </div>
+                        
+                        <div id="stl-recommendations" class="mt-4 hidden">
+                            <h3 class="text-sm font-semibold text-green-400 mb-2">💡 Recommendations</h3>
+                            <ul id="stl-recommendations-list" class="list-disc list-inside text-xs text-gray-300 space-y-1">
                             </ul>
                         </div>
                     </div>
@@ -2971,6 +3101,156 @@
                 });
             });
         })();
+
+        // ===== v11: STL Mesh Analysis =====
+        
+        // STL dropzone handlers
+        (function initStlDropzone(){
+            const drop = document.getElementById('stl-dropzone');
+            const input = document.getElementById('stlAnalysisFile');
+            const choose = document.getElementById('stlSelectBtn');
+            const meta = document.getElementById('stl-file-meta');
+            if (!drop || !input) return;
+            ['dragenter','dragover','dragleave','drop'].forEach(evt => {
+                drop.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }, false);
+            });
+            drop.addEventListener('dragover', () => drop.classList.add('border-blue-500'));
+            drop.addEventListener('dragleave', () => drop.classList.remove('border-blue-500'));
+            drop.addEventListener('drop', e => {
+                drop.classList.remove('border-blue-500');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    input.files = e.dataTransfer.files;
+                    const f = e.dataTransfer.files[0];
+                    if (meta) meta.textContent = `${f.name} • ${(f.size/1024/1024).toFixed(2)} MB`;
+                }
+            });
+            if (choose) choose.addEventListener('click', () => input.click());
+            drop.addEventListener('click', () => input.click());
+            input.addEventListener('change', () => {
+                if (input.files && input.files[0] && meta) {
+                    const f = input.files[0];
+                    meta.textContent = `${f.name} • ${(f.size/1024/1024).toFixed(2)} MB`;
+                }
+            });
+        })();
+
+        // STL analysis handler
+        document.getElementById('analyzeStlBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('stlAnalysisFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select an STL file first.');
+                return;
+            }
+            
+            const spinner = document.getElementById('stl-analysis-spinner');
+            const errorDiv = document.getElementById('stl-error-message');
+            const errorText = document.getElementById('stl-error-text');
+            const resultsPanel = document.getElementById('stl-results-panel');
+            
+            // Hide previous results and errors
+            resultsPanel.classList.add('hidden');
+            errorDiv.classList.add('hidden');
+            
+            // Show spinner
+            spinner.classList.remove('hidden');
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // Check if comparing with G-code
+                const compareCheckbox = document.getElementById('compare-with-gcode');
+                if (compareCheckbox && compareCheckbox.checked) {
+                    const gcodeInput = document.getElementById('gcodeAnalysisFile');
+                    if (gcodeInput.files[0]) {
+                        formData.append('compare_gcode', gcodeInput.files[0]);
+                    }
+                }
+                
+                const response = await fetch(`${API_BASE_URL}/analyze_stl`, {
+                    method: 'POST',
+                    body: formData
+                });
+            
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `Server error: ${response.status}`);
+                }
+            
+                const result = await response.json();
+                displayStlAnalysis(result);
+            
+            } catch (error) {
+                console.error('STL analysis failed:', error);
+                errorText.textContent = error.message || 'Unknown error occurred.';
+                errorDiv.classList.remove('hidden');
+            } finally {
+                spinner.classList.add('hidden');
+            }
+        });
+
+        function displayStlAnalysis(result) {
+            const resultsPanel = document.getElementById('stl-results-panel');
+            resultsPanel.classList.remove('hidden');
+            
+            const quality = result.mesh_quality;
+            
+            // Quality score with color
+            const scoreEl = document.getElementById('stl-quality-score');
+            scoreEl.textContent = quality.mesh_quality_score;
+            if (quality.mesh_quality_score >= 80) {
+                scoreEl.style.color = '#10b981'; // green
+            } else if (quality.mesh_quality_score >= 60) {
+                scoreEl.style.color = '#f59e0b'; // orange
+            } else {
+                scoreEl.style.color = '#ef4444'; // red
+            }
+            
+            // Basic stats
+            document.getElementById('stl-vertices').textContent = quality.vertex_count.toLocaleString();
+            document.getElementById('stl-faces').textContent = quality.face_count.toLocaleString();
+            document.getElementById('stl-volume').textContent = `${quality.volume_cm3.toFixed(2)} cm³`;
+            document.getElementById('stl-area').textContent = `${quality.surface_area_cm2.toFixed(2)} cm²`;
+            
+            // Quality indicators
+            document.getElementById('stl-watertight').textContent = quality.is_watertight ? '✅ Yes' : '❌ No';
+            document.getElementById('stl-watertight').style.color = quality.is_watertight ? '#10b981' : '#ef4444';
+            
+            document.getElementById('stl-manifold').textContent = quality.is_manifold ? '✅ Yes' : '❌ No';
+            document.getElementById('stl-manifold').style.color = quality.is_manifold ? '#10b981' : '#ef4444';
+            
+            document.getElementById('stl-tri-quality').textContent = quality.triangle_quality_mean.toFixed(3);
+            document.getElementById('stl-aspect-ratio').textContent = quality.aspect_ratio_max.toFixed(2);
+            
+            // G-code comparison
+            if (result.gcode_comparison) {
+                const comp = result.gcode_comparison;
+                const compDiv = document.getElementById('stl-gcode-comparison');
+                compDiv.classList.remove('hidden');
+                
+                document.getElementById('stl-hausdorff').textContent = `${comp.hausdorff_distance_mm.toFixed(3)} mm`;
+                document.getElementById('stl-mean-dev').textContent = `${comp.mean_deviation_mm.toFixed(3)} mm`;
+                document.getElementById('stl-accuracy').textContent = `${comp.overall_accuracy_percent.toFixed(1)}%`;
+            }
+            
+            // Warnings
+            if (quality.warnings && quality.warnings.length > 0) {
+                const warningsDiv = document.getElementById('stl-warnings');
+                const warningsList = document.getElementById('stl-warnings-list');
+                warningsDiv.classList.remove('hidden');
+                warningsList.innerHTML = quality.warnings.map(w => `<li>${w}</li>`).join('');
+            }
+            
+            // Recommendations
+            if (quality.recommendations && quality.recommendations.length > 0) {
+                const recsDiv = document.getElementById('stl-recommendations');
+                const recsList = document.getElementById('stl-recommendations-list');
+                recsDiv.classList.remove('hidden');
+                recsList.innerHTML = quality.recommendations.map(r => `<li>${r}</li>`).join('');
+            }
+        }
 
         // --- Initial Run ---
         loadMaterials(); // Load the materials DB first

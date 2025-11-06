@@ -1,8 +1,15 @@
-FDM 3D Print Property Simulator (v9)
+FDM 3D Print Property Simulator (v11)
 
 This application is a multi-model simulator and optimizer for Fused Deposition Modeling (FDM) 3D printing. It uses a Python (FastAPI) backend to run several machine learning models trained on published research data. The frontend is a single, static HTML file that provides a UI for simulating properties and optimizing parameters.
 
 Recent updates:
+- **v11: NEW - STL Mesh Quality Analysis & G-Code Deviation Detection** (Based on Montalti et al. 2024)
+  - Analyze STL mesh quality before slicing
+  - Detect non-manifold edges, holes, poor tessellation
+  - Compare STL vs G-code geometry to quantify slicing errors
+  - Calculate Hausdorff distance for dimensional accuracy
+  - Get recommendations for mesh repair and export settings
+- v10: Enhanced G-Code analysis with robust parsing (M82/M83, G20/G21, G92 support)
 - v9: New Composite Filament model (e.g., Carbon/Glass Fiber reinforced PLA/PETG)
 - v8: New Multi-Material Bond model (ABS+PETG)
 - v7: New Hardness model
@@ -106,7 +113,7 @@ Do not close this terminal. The server is now running.
 
 To use the app: Open the fdm_simulator.html file directly in your web browser (e.g., by double-clicking it).
 
-Application Features (v9)
+Application Features (v11)
 
 1. Simulator Tab
 
@@ -123,31 +130,12 @@ Fatigue Lifetime: Predicts how many Cycles a part can withstand.
 C3 Model: Predicts Tensile Strength and Elongation.
 
 FEA Material Card: Predicts the full anisotropic material card for professional FEA software.
+
 Hardness: Predicts Shore D hardness.
+
 Multi-Material Bond: Predicts ABS+PETG interface tensile strength.
-Composite Filaments (New): Predicts tensile strength (MPa) and elastic modulus (GPa) for reinforced filaments.
 
-Composite Filament Dataset (v9)
-
-The repository includes a starter CSV `data/raw/composite_data_alarifi.csv` with **synthetic demonstration data**. This is a placeholder to allow the model to train and the app to run immediately. For real-world engineering use, **replace this file** with actual data from:
-
-- The Alarifi paper ("Mechanical properties and numerical simulation of FDM 3D printed PETG/carbon composite")
-- Other peer-reviewed composite filament studies
-- Your own experimental measurements
-
-Required columns in the CSV:
-
-- Reinforcement_Material (string: e.g., "Carbon Fiber", "Glass Fiber")
-- Reinforcement_percent (number: 0-40)
-- Layer_Height_mm (number)
-- Infill_Density_percent (integer)
-- Print_Speed (integer, mm/s)
-- Nozzle_Temperature (integer, °C)
-- Bed_Temperature (integer, °C)
-- Tensile_Strength_MPa (number)
-- Elastic_Modulus_GPa (number)
-
-Run `python run_all_training.py` and the composite model will be trained automatically if missing. If the CSV is not present, the `/predict/composite` endpoint will return HTTP 503 (model not loaded), while the rest of the app works normally.
+Composite Filaments: Predicts tensile strength (MPa) and elastic modulus (GPa) for reinforced filaments.
 
 2. Optimizer Tab
 
@@ -159,7 +147,34 @@ Select your objectives (e.g., "Minimize: Warpage (mm)" and "Minimize: Print Time
 
 The app runs a genetic algorithm (NSGA-II) to find the "Top 5" best trade-off solutions.
 
-3. Global Settings
+3. G-Code Analysis Tab (v10+)
+
+Upload your sliced G-code file to get:
+- Print time and material usage estimates
+- Layer-by-layer visualization with feature coloring
+- Feature breakdown (walls, infill, supports, etc.)
+- Optimization suggestions based on toolpath analysis
+- Interactive 3D viewer with per-layer scrubber
+
+**NEW in v11: STL Mesh Quality Analysis**
+- Upload STL files to analyze mesh quality before slicing
+- Detect issues: non-watertight, non-manifold geometry, poor triangulation
+- Calculate mesh statistics: vertices, faces, volume, surface area
+- Triangle quality metrics (aspect ratio, edge length variance)
+- Optional: Compare STL vs G-code to measure slicing deviation
+  - Hausdorff distance calculation (max deviation)
+  - Mean deviation and overall accuracy percentage
+  - Identify error-prone regions
+- Get actionable recommendations:
+  - Re-export with better tessellation settings
+  - Repair mesh using recommended tools
+  - Adjust slicer resolution settings
+
+**Research Foundation:**
+Based on Montalti et al. (2024) "From CAD to G-code: Strategies to minimizing errors in 3D printing process" 
+(CIRP Journal of Manufacturing Science and Technology)
+
+4. Global Settings
 
 Filament Used (g): Enter the part weight from your slicer.
 

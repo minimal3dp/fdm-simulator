@@ -1,7 +1,7 @@
 [project]
 name = "fdm-simulator"
-version = "0.1.0"
-description = "An Application to Simulate FDM 3D Printing Outcomes Using Machine Learning Models"
+version = "0.11.0"
+description = "An Application to Simulate FDM 3D Printing Outcomes Using Machine Learning Models with STL Mesh Analysis"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -10,11 +10,14 @@ dependencies = [
     "jinja2>=3.1.6",
     "joblib>=1.5.2",
     "numpy>=2.3.4",
+    "numpy-stl>=3.1.2",
     "pandas>=2.3.3",
     "pydantic>=2.12.3",
     "pymoo>=0.6.1.5",
     "python-multipart>=0.0.20",
     "scikit-learn>=1.7.2",
     "scikit-optimize>=0.10.2",
+    "scipy>=1.15.2",
+    "trimesh>=4.5.3",
     "uvicorn>=0.38.0",
 ]

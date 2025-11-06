@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any, Type
 import io
+import trimesh
+from scipy.spatial.distance import directed_hausdorff
 # Optional: External G-code parser not required for our analysis; using manual parsing
 
 # --- v4: Optimization Imports ---
@@ -25,7 +27,7 @@ MATERIALS_FILE = "materials.json"
 FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
 
 # --- FastAPI App Initialization ---
-app = FastAPI(title="FDM 3D Print Property Simulator API (v8 Refactored)")
+app = FastAPI(title="FDM 3D Print Property Simulator API (v11 with STL Analysis)")
 
 # Configure CORS
 app.add_middleware(
@@ -1041,3 +1043,221 @@ async def analyze_gcode(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to analyze G-code: {str(e)}")
+
+
+# ===== v11: STL Mesh Quality Analysis =====
+
+class STLMeshQuality(BaseModel):
+    vertex_count: int
+    face_count: int
+    edge_count: int
+    is_watertight: bool
+    is_manifold: bool
+    volume_cm3: float
+    surface_area_cm2: float
+    bounding_box_mm: Dict[str, float]
+    mesh_quality_score: float  # 0-100
+    triangle_quality_mean: float
+    triangle_quality_min: float
+    edge_length_mean_mm: float
+    edge_length_std_mm: float
+    aspect_ratio_mean: float
+    aspect_ratio_max: float
+    warnings: List[str]
+    recommendations: List[str]
+
+
+class GCodeReconstructionResult(BaseModel):
+    reconstructed_vertices: int
+    hausdorff_distance_mm: float  # Max deviation between STL and G-code
+    mean_deviation_mm: float
+    error_regions: List[Dict[str, Any]]  # Regions with high error
+    overall_accuracy_percent: float
+
+
+class STLAnalysisResult(BaseModel):
+    filename: str
+    mesh_quality: STLMeshQuality
+    gcode_comparison: Optional[GCodeReconstructionResult] = None
+
+
+@app.post("/analyze_stl")
+async def analyze_stl(
+    file: UploadFile = File(...),
+    compare_gcode: Optional[UploadFile] = File(None)
+):
+    """
+    Analyze STL mesh quality and optionally compare with G-code reconstruction.
+    Based on Montalti et al. (2024) - strategies to minimize CAD-to-G-code errors.
+    """
+    try:
+        # Read STL file
+        content = await file.read()
+        mesh = trimesh.load(io.BytesIO(content), file_type='stl')
+        
+        # Basic mesh metrics
+        warnings = []
+        recommendations = []
+        
+        # Check if watertight
+        is_watertight = mesh.is_watertight
+        if not is_watertight:
+            warnings.append("Mesh is not watertight - may cause slicing issues")
+            recommendations.append("Repair mesh using Meshmixer or similar tool")
+        
+        # Check if manifold
+        is_manifold = not mesh.is_watertight or len(mesh.split()) == 1
+        if not is_manifold:
+            warnings.append("Mesh has non-manifold edges")
+            recommendations.append("Fix non-manifold geometry before slicing")
+        
+        # Calculate triangle quality (aspect ratio)
+        triangles = mesh.triangles
+        triangle_qualities = []
+        aspect_ratios = []
+        
+        for tri in triangles:
+            # Calculate edge lengths
+            edge1 = np.linalg.norm(tri[1] - tri[0])
+            edge2 = np.linalg.norm(tri[2] - tri[1])
+            edge3 = np.linalg.norm(tri[0] - tri[2])
+            
+            # Quality metric: ratio of shortest to longest edge
+            longest = max(edge1, edge2, edge3)
+            shortest = min(edge1, edge2, edge3)
+            quality = shortest / longest if longest > 0 else 0
+            triangle_qualities.append(quality)
+            
+            # Aspect ratio
+            semi_perim = (edge1 + edge2 + edge3) / 2
+            if semi_perim > 0:
+                area = np.sqrt(semi_perim * (semi_perim - edge1) * (semi_perim - edge2) * (semi_perim - edge3))
+                aspect = longest / (2 * np.sqrt(3) * area) if area > 0 else float('inf')
+                aspect_ratios.append(aspect)
+        
+        triangle_quality_mean = np.mean(triangle_qualities) if triangle_qualities else 0
+        triangle_quality_min = np.min(triangle_qualities) if triangle_qualities else 0
+        aspect_ratio_mean = np.mean([a for a in aspect_ratios if a != float('inf')]) if aspect_ratios else 0
+        aspect_ratio_max = max([a for a in aspect_ratios if a != float('inf')], default=0)
+        
+        if triangle_quality_mean < 0.3:
+            warnings.append("Poor triangle quality detected")
+            recommendations.append("Re-export STL with better tessellation settings")
+        
+        # Calculate edge statistics
+        edges = mesh.edges_unique
+        edge_lengths = mesh.edges_unique_length
+        edge_length_mean = float(np.mean(edge_lengths))
+        edge_length_std = float(np.std(edge_lengths))
+        
+        if edge_length_std / edge_length_mean > 5:
+            warnings.append("High edge length variance - mesh may have detail loss")
+            recommendations.append("Use adaptive meshing or finer resolution")
+        
+        # Bounding box
+        bounds = mesh.bounds
+        bbox = {
+            'x_min': float(bounds[0][0]),
+            'y_min': float(bounds[0][1]),
+            'z_min': float(bounds[0][2]),
+            'x_max': float(bounds[1][0]),
+            'y_max': float(bounds[1][1]),
+            'z_max': float(bounds[1][2]),
+            'width': float(bounds[1][0] - bounds[0][0]),
+            'depth': float(bounds[1][1] - bounds[0][1]),
+            'height': float(bounds[1][2] - bounds[0][2])
+        }
+        
+        # Overall quality score (0-100)
+        score = 100.0
+        if not is_watertight:
+            score -= 30
+        if not is_manifold:
+            score -= 20
+        if triangle_quality_mean < 0.5:
+            score -= 20 * (1 - triangle_quality_mean / 0.5)
+        if aspect_ratio_max > 10:
+            score -= 10
+        score = max(0, score)
+        
+        mesh_quality = STLMeshQuality(
+            vertex_count=len(mesh.vertices),
+            face_count=len(mesh.faces),
+            edge_count=len(edges),
+            is_watertight=is_watertight,
+            is_manifold=is_manifold,
+            volume_cm3=float(mesh.volume / 1000),  # mm³ to cm³
+            surface_area_cm2=float(mesh.area / 100),  # mm² to cm²
+            bounding_box_mm=bbox,
+            mesh_quality_score=round(score, 1),
+            triangle_quality_mean=round(triangle_quality_mean, 3),
+            triangle_quality_min=round(triangle_quality_min, 3),
+            edge_length_mean_mm=round(edge_length_mean, 3),
+            edge_length_std_mm=round(edge_length_std, 3),
+            aspect_ratio_mean=round(aspect_ratio_mean, 3),
+            aspect_ratio_max=round(aspect_ratio_max, 3),
+            warnings=warnings,
+            recommendations=recommendations
+        )
+        
+        # Optional: Compare with G-code reconstruction
+        gcode_comparison = None
+        if compare_gcode:
+            gcode_content = await compare_gcode.read()
+            gcode_text = gcode_content.decode('utf-8')
+            
+            # Reconstruct geometry from G-code
+            reconstructed_points = []
+            lines = gcode_text.split('\n')
+            current_x, current_y, current_z = 0.0, 0.0, 0.0
+            
+            for line in lines:
+                line = line.strip()
+                if line.startswith('G1') or line.startswith('G0'):
+                    parts = line.split()
+                    for part in parts:
+                        if part.startswith('X'):
+                            current_x = float(part[1:])
+                        elif part.startswith('Y'):
+                            current_y = float(part[1:])
+                        elif part.startswith('Z'):
+                            current_z = float(part[1:])
+                    
+                    if 'E' in line:  # Only extrusion moves
+                        reconstructed_points.append([current_x, current_y, current_z])
+            
+            if reconstructed_points:
+                reconstructed_array = np.array(reconstructed_points)
+                
+                # Calculate Hausdorff distance
+                stl_points = mesh.sample(min(len(reconstructed_array), 5000))
+                hausdorff_fwd = directed_hausdorff(stl_points, reconstructed_array)[0]
+                hausdorff_back = directed_hausdorff(reconstructed_array, stl_points)[0]
+                hausdorff_distance = max(hausdorff_fwd, hausdorff_back)
+                
+                # Mean deviation (approximate)
+                mean_deviation = (hausdorff_fwd + hausdorff_back) / 2
+                
+                # Calculate accuracy percentage
+                bbox_diagonal = np.linalg.norm([bbox['width'], bbox['depth'], bbox['height']])
+                accuracy_percent = max(0, 100 * (1 - hausdorff_distance / bbox_diagonal))
+                
+                gcode_comparison = GCodeReconstructionResult(
+                    reconstructed_vertices=len(reconstructed_points),
+                    hausdorff_distance_mm=round(hausdorff_distance, 3),
+                    mean_deviation_mm=round(mean_deviation, 3),
+                    error_regions=[],  # TODO: Implement region-based error analysis
+                    overall_accuracy_percent=round(accuracy_percent, 1)
+                )
+        
+        return STLAnalysisResult(
+            filename=file.filename,
+            mesh_quality=mesh_quality,
+            gcode_comparison=gcode_comparison
+        )
+        
+    except Exception as e:
+        print(f"STL analysis error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to analyze STL: {str(e)}")
