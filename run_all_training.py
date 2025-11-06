@@ -1,6 +1,7 @@
 import os
-import re  # Import regex library
+import re  # regex utilities
 import subprocess
+import sys
 
 import joblib
 import pandas as pd
@@ -10,43 +11,51 @@ from sklearn.multioutput import MultiOutputRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-# --- Configuration ---
-DATA_DIR = "data"
-RAW_DIR = os.path.join(DATA_DIR, "raw")
-PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
-MODELS_DIR = "models"
+from config import (
+    ACCURACY_RAW_PATH as PATH_ACCURACY_RAW,
+)
+from config import (
+    C3_PROCESSED_PATH as PATH_C3_PROCESSED,
+)
+from config import (
+    C3_RAW_PATH as PATH_C3_RAW,
+)
+from config import (
+    COMPOSITE_RAW_PATH as PATH_COMPOSITE_RAW,
+)
+from config import (
+    FATIGUE_RAW_PATH as PATH_FATIGUE_RAW,
+)
+from config import (
+    FEA_RAW_PATH as PATH_FEA_RAW,
+)
+from config import (
+    FEA_TARGETS_PATH,
+    MODEL_ACCURACY_PATH,
+    MODEL_C3_PATH,
+    MODEL_COMPOSITE_PATH,
+    MODEL_FATIGUE_PATH,
+    MODEL_FEA_PATH,
+    MODEL_HARDNESS_PATH,
+    MODEL_KAGGLE_PATH,
+    MODEL_MULTIMATERIAL_PATH,
+    MODEL_WARPAGE_PATH,
+    ensure_directories,
+)
+from config import (
+    HARDNESS_RAW_PATH as PATH_HARDNESS_RAW,
+)
+from config import (
+    KAGGLE_RAW_PATH as PATH_KAGGLE_RAW,
+)
+from config import (
+    MULTIMATERIAL_RAW_PATH as PATH_MULTIMATERIAL_RAW,
+)
+from config import (
+    WARPAGE_RAW_PATH as PATH_WARPAGE_RAW,
+)
 
-# Ensure directories exist
-os.makedirs(PROCESSED_DIR, exist_ok=True)
-os.makedirs(MODELS_DIR, exist_ok=True)
-
-# File Paths
-PATH_KAGGLE_RAW = os.path.join(RAW_DIR, "data.csv")
-PATH_C3_RAW = os.path.join(RAW_DIR, "C3-RAW DATA.csv")
-PATH_FEA_RAW = os.path.join(RAW_DIR, "3D_Printing_Data.xlsx - Sheet1.csv")
-PATH_FATIGUE_RAW = os.path.join(RAW_DIR, "1-s2.0-S2352340922000580-mmc1.xlsx - Data.csv")
-PATH_ACCURACY_RAW = os.path.join(RAW_DIR, "dimensional_accuracy_deswal.csv")
-PATH_WARPAGE_RAW = os.path.join(RAW_DIR, "warpage_data_nazan.csv")
-PATH_HARDNESS_RAW = os.path.join(RAW_DIR, "hardness_data_kadam.csv")
-PATH_MULTIMATERIAL_RAW = os.path.join(RAW_DIR, "multimaterial_bond_yadav.csv")  # v8: New Path
-PATH_COMPOSITE_RAW = os.path.join(
-    RAW_DIR, "composite_data_alarifi.csv"
-)  # v9: New Composite dataset path
-
-PATH_C3_PROCESSED = os.path.join(PROCESSED_DIR, "c3_processed_data.csv")
-
-MODEL_KAGGLE_PATH = os.path.join(MODELS_DIR, "model_kaggle.joblib")
-MODEL_C3_PATH = os.path.join(MODELS_DIR, "model_c3.joblib")
-MODEL_FEA_PATH = os.path.join(MODELS_DIR, "model_fea.joblib")
-MODEL_FATIGUE_PATH = os.path.join(MODELS_DIR, "model_fatigue.joblib")
-MODEL_ACCURACY_PATH = os.path.join(MODELS_DIR, "model_accuracy.joblib")
-MODEL_WARPAGE_PATH = os.path.join(MODELS_DIR, "model_warpage.joblib")
-MODEL_HARDNESS_PATH = os.path.join(MODELS_DIR, "model_hardness.joblib")
-MODEL_MULTIMATERIAL_PATH = os.path.join(MODELS_DIR, "model_multimaterial.joblib")  # v8: New Model
-MODEL_COMPOSITE_PATH = os.path.join(MODELS_DIR, "model_composite.joblib")  # v9: New Model
-
-# Path for FEA target names
-FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
+ensure_directories()
 
 
 # --- Model 1: Kaggle ---
@@ -109,7 +118,7 @@ def train_kaggle_model():
         # Train the model
         print("Training Kaggle model...")
         pipeline.fit(X, y)
-        joblib.dump(pipeline, MODEL_KAGGLE_PATH)
+        joblib.dump(pipeline, str(MODEL_KAGGLE_PATH))
         print(f"Kaggle model saved to {MODEL_KAGGLE_PATH}")
 
     except FileNotFoundError:
@@ -135,7 +144,13 @@ def process_c3_data():
             max_stress = group.loc[max_stress_idx, 'Stress']
             elongation_at_break = group.loc[max_stress_idx, 'Strain']
 
-            row = list(params) + [max_stress, elongation_at_break * 100]  # Strain as %
+            # Ensure numeric multiplication for percentage conversion
+            elong_pct = pd.to_numeric(elongation_at_break, errors='coerce')
+            if pd.isna(elong_pct):
+                elong_pct = 0.0
+            else:
+                elong_pct = float(elong_pct) * 100.0
+            row = list(params) + [max_stress, elong_pct]  # Strain as %
             results.append(row)
 
         # Create a new DataFrame
@@ -176,7 +191,7 @@ def train_c3_model():
 
         print("Training C3 model...")
         pipeline.fit(X, y)
-        joblib.dump(pipeline, MODEL_C3_PATH)
+        joblib.dump(pipeline, str(MODEL_C3_PATH))
         print(f"C3 model saved to {MODEL_C3_PATH}")
 
     except FileNotFoundError:
@@ -282,9 +297,9 @@ def train_fea_model():
         pipeline.fit(X, y)
 
         # Save the model AND the target names
-        joblib.dump(pipeline, MODEL_FEA_PATH)
+        joblib.dump(pipeline, str(MODEL_FEA_PATH))
         print(f"FEA model saved to {MODEL_FEA_PATH}")
-        joblib.dump(target_cols, FEA_TARGETS_PATH)
+        joblib.dump(target_cols, str(FEA_TARGETS_PATH))
         print(f"FEA target names saved to {FEA_TARGETS_PATH}")
 
     except FileNotFoundError:
@@ -323,7 +338,7 @@ def train_fatigue_model():
 
         print("Training Fatigue model...")
         pipeline.fit(X, y)
-        joblib.dump(pipeline, MODEL_FATIGUE_PATH)
+        joblib.dump(pipeline, str(MODEL_FATIGUE_PATH))
         print(f"Fatigue model saved to {MODEL_FATIGUE_PATH}")
 
     except FileNotFoundError:
@@ -364,7 +379,7 @@ def train_accuracy_model():
 
         print("Training Accuracy model...")
         pipeline.fit(X, y)
-        joblib.dump(pipeline, MODEL_ACCURACY_PATH)
+        joblib.dump(pipeline, str(MODEL_ACCURACY_PATH))
         print(f"Accuracy model saved to {MODEL_ACCURACY_PATH}")
 
     except FileNotFoundError:
@@ -405,7 +420,7 @@ def train_warpage_model():
 
         print("Training Warpage model...")
         pipeline.fit(X, y)
-        joblib.dump(pipeline, MODEL_WARPAGE_PATH)
+        joblib.dump(pipeline, str(MODEL_WARPAGE_PATH))
         print(f"Warpage model saved to {MODEL_WARPAGE_PATH}")
 
     except FileNotFoundError:
@@ -464,7 +479,7 @@ def train_hardness_model():
         # Train the model
         print("Training Hardness model...")
         pipeline.fit(X, y)
-        joblib.dump(pipeline, MODEL_HARDNESS_PATH)
+        joblib.dump(pipeline, str(MODEL_HARDNESS_PATH))
         print(f"Hardness model saved to {MODEL_HARDNESS_PATH}")
 
     except FileNotFoundError:
@@ -524,7 +539,7 @@ def train_multimaterial_model():
         # Train the model
         print("Training Multi-Material model...")
         pipeline.fit(X, y)
-        joblib.dump(pipeline, MODEL_MULTIMATERIAL_PATH)
+        joblib.dump(pipeline, str(MODEL_MULTIMATERIAL_PATH))
         print(f"Multi-Material model saved to {MODEL_MULTIMATERIAL_PATH}")
 
     except FileNotFoundError:
@@ -580,7 +595,7 @@ def train_composite_model():
 
         print("Training Composite model...")
         pipeline.fit(X, y)
-        joblib.dump(pipeline, MODEL_COMPOSITE_PATH)
+        joblib.dump(pipeline, str(MODEL_COMPOSITE_PATH))
         print(f"Composite model saved to {MODEL_COMPOSITE_PATH}")
 
     except FileNotFoundError:
@@ -653,10 +668,14 @@ def main():
         print("--- Composite Model already trained. Skipping. ---")
 
     print("\nAll models checked/trained.")
-    print("Starting FastAPI server...")
-
-    # Start the Uvicorn server as a subprocess
-    subprocess.run(["uvicorn", "main:app", "--reload"])
+    start_server = os.getenv("START_SERVER", "1")
+    if start_server == "1":
+        print("Starting FastAPI server...")
+        # Start the Uvicorn server as a subprocess
+        # Use module invocation to avoid relying on shell PATH for uvicorn executable
+        subprocess.run([sys.executable, "-m", "uvicorn", "main:app", "--reload"])
+    else:
+        print("START_SERVER is not '1' — skipping server startup.")
 
 
 if __name__ == "__main__":

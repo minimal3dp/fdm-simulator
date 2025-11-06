@@ -22,10 +22,23 @@ from pymoo.optimize import minimize
 from pymoo.termination import get_termination
 from scipy.spatial.distance import directed_hausdorff
 
-# --- Configuration ---
-MODELS_DIR = "models"
-MATERIALS_FILE = "materials.json"
-FEA_TARGETS_PATH = os.path.join(MODELS_DIR, "fea_target_names.joblib")
+# --- Configuration (centralized) ---
+from config import (  # noqa: E402
+    FEA_TARGETS_PATH,
+    MATERIALS_FILE,
+    MODEL_ACCURACY_PATH,
+    MODEL_C3_PATH,
+    MODEL_COMPOSITE_PATH,
+    MODEL_FATIGUE_PATH,
+    MODEL_FEA_PATH,
+    MODEL_HARDNESS_PATH,
+    MODEL_KAGGLE_PATH,
+    MODEL_MULTIMATERIAL_PATH,
+    MODEL_WARPAGE_PATH,
+    MODELS_DIR,
+)
+
+MODELS_DIR = str(MODELS_DIR)  # keep existing string usage without large refactor
 
 # --- FastAPI App Initialization ---
 app = FastAPI(title="FDM 3D Print Property Simulator API (v12 with Sensitivity Analysis)")
@@ -211,7 +224,7 @@ class OptimizationRequest(BaseModel):
 def get_model_registry() -> dict[str, dict[str, Any]]:
     return {
         "kaggle": {
-            "path": os.path.join(MODELS_DIR, "model_kaggle.joblib"),
+            "path": str(MODEL_KAGGLE_PATH),
             "model": None,
             "input_model": KaggleInput,
             "output_model": KaggleOutput,
@@ -238,7 +251,7 @@ def get_model_registry() -> dict[str, dict[str, Any]]:
             },
         },
         "c3": {
-            "path": os.path.join(MODELS_DIR, "model_c3.joblib"),
+            "path": str(MODEL_C3_PATH),
             "model": None,
             "input_model": C3Input,
             "output_model": C3Output,
@@ -247,7 +260,7 @@ def get_model_registry() -> dict[str, dict[str, Any]]:
             "optimizer_config": None,  # Not implemented for optimizer
         },
         "fea": {
-            "path": os.path.join(MODELS_DIR, "model_fea.joblib"),
+            "path": str(MODEL_FEA_PATH),
             "model": None,
             "input_model": FEAInput,
             "output_model": FEAOutput,
@@ -260,7 +273,7 @@ def get_model_registry() -> dict[str, dict[str, Any]]:
             "optimizer_config": None,  # FEA is too complex for this optimizer
         },
         "fatigue": {
-            "path": os.path.join(MODELS_DIR, "model_fatigue.joblib"),
+            "path": str(MODEL_FATIGUE_PATH),
             "model": None,
             "input_model": FatigueInput,
             "output_model": FatigueOutput,
@@ -269,7 +282,7 @@ def get_model_registry() -> dict[str, dict[str, Any]]:
             "optimizer_config": None,  # Not implemented for optimizer
         },
         "accuracy": {
-            "path": os.path.join(MODELS_DIR, "model_accuracy.joblib"),
+            "path": str(MODEL_ACCURACY_PATH),
             "model": None,
             "input_model": AccuracyInput,
             "output_model": AccuracyOutput,
@@ -290,7 +303,7 @@ def get_model_registry() -> dict[str, dict[str, Any]]:
             },
         },
         "warpage": {
-            "path": os.path.join(MODELS_DIR, "model_warpage.joblib"),
+            "path": str(MODEL_WARPAGE_PATH),
             "model": None,
             "input_model": WarpageInput,
             "output_model": WarpageOutput,
@@ -311,7 +324,7 @@ def get_model_registry() -> dict[str, dict[str, Any]]:
             },
         },
         "hardness": {
-            "path": os.path.join(MODELS_DIR, "model_hardness.joblib"),
+            "path": str(MODEL_HARDNESS_PATH),
             "model": None,
             "input_model": HardnessInput,
             "output_model": HardnessOutput,
@@ -331,7 +344,7 @@ def get_model_registry() -> dict[str, dict[str, Any]]:
             },
         },
         "multimaterial": {
-            "path": os.path.join(MODELS_DIR, "model_multimaterial.joblib"),
+            "path": str(MODEL_MULTIMATERIAL_PATH),
             "model": None,
             "input_model": MultiMaterialInput,
             "output_model": MultiMaterialOutput,
@@ -351,7 +364,7 @@ def get_model_registry() -> dict[str, dict[str, Any]]:
             },
         },
         "composite": {
-            "path": os.path.join(MODELS_DIR, "model_composite.joblib"),
+            "path": str(MODEL_COMPOSITE_PATH),
             "model": None,
             "input_model": CompositeInput,
             "output_model": CompositeOutput,
@@ -745,13 +758,13 @@ async def analyze_sensitivity(request: SensitivityRequest):
                 total_impact += avg_pct_change
 
             # Normalize impact score to 0-100
-            impact_score = total_impact / len(output_changes) if output_changes else 0.0
+            impact_score = float(total_impact) / len(output_changes) if output_changes else 0.0
 
             sensitivities.append(
                 ParameterSensitivity(
                     parameter_name=param_name,
                     baseline_value=param_value,
-                    impact_score=round(impact_score, 2),
+                    impact_score=float(round(impact_score, 2)),
                     output_changes=output_changes,
                     perturbation_range={
                         "min": round(min(perturb_values), 3),
@@ -1397,10 +1410,19 @@ async def analyze_stl(file: UploadFile = File(...), compare_gcode: UploadFile | 
             )
 
         # Load mesh from in-memory buffer
-        mesh = trimesh.load(io.BytesIO(content), file_type='stl')
+        # Robust mesh load: handle single geometry vs scene, ensure attributes exist
+        loaded = trimesh.load(io.BytesIO(content), file_type='stl')
+        if isinstance(loaded, trimesh.Scene):  # pick first geometry if scene
+            if not loaded.geometry:
+                raise HTTPException(status_code=422, detail="Empty STL scene: no geometries found")
+            # merge into a single mesh for uniform handling
+            mesh = trimesh.util.concatenate(tuple(loaded.geometry.values()))
+        else:
+            mesh = loaded
 
         # Enforce triangle complexity limit early to avoid heavy computations
-        face_count = int(len(mesh.faces)) if hasattr(mesh, "faces") else 0
+        faces = getattr(mesh, "faces", np.empty((0, 3)))
+        face_count = int(len(faces))
         if face_count > max_triangles:
             raise HTTPException(
                 status_code=413,
@@ -1419,19 +1441,23 @@ async def analyze_stl(file: UploadFile = File(...), compare_gcode: UploadFile | 
         recommendations = []
 
         # Check if watertight
-        is_watertight = mesh.is_watertight
+        is_watertight = bool(getattr(mesh, "is_watertight", False))
         if not is_watertight:
             warnings.append("Mesh is not watertight - may cause slicing issues")
             recommendations.append("Repair mesh using Meshmixer or similar tool")
 
         # Check if manifold
-        is_manifold = not mesh.is_watertight or len(mesh.split()) == 1
+        # Manifold heuristic guarded for missing attributes
+        try:
+            is_manifold = (not is_watertight) or (len(mesh.split()) == 1)
+        except Exception:
+            is_manifold = True  # assume manifold if split fails
         if not is_manifold:
             warnings.append("Mesh has non-manifold edges")
             recommendations.append("Fix non-manifold geometry before slicing")
 
         # Calculate triangle quality (aspect ratio)
-        triangles = mesh.triangles
+        triangles = getattr(mesh, "triangles", np.empty((0, 3, 3)))
         triangle_qualities = []
         aspect_ratios = []
 
@@ -1468,8 +1494,8 @@ async def analyze_stl(file: UploadFile = File(...), compare_gcode: UploadFile | 
             recommendations.append("Re-export STL with better tessellation settings")
 
         # Calculate edge statistics
-        edges = mesh.edges_unique
-        edge_lengths = mesh.edges_unique_length
+        edges = getattr(mesh, "edges_unique", np.empty((0, 2)))
+        edge_lengths = getattr(mesh, "edges_unique_length", np.array([]))
         edge_length_mean = float(np.mean(edge_lengths))
         edge_length_std = float(np.std(edge_lengths))
 
@@ -1478,7 +1504,7 @@ async def analyze_stl(file: UploadFile = File(...), compare_gcode: UploadFile | 
             recommendations.append("Use adaptive meshing or finer resolution")
 
         # Bounding box
-        bounds = mesh.bounds
+        bounds = getattr(mesh, "bounds", np.array([[0, 0, 0], [0, 0, 0]]))
         bbox = {
             'x_min': float(bounds[0][0]),
             'y_min': float(bounds[0][1]),
@@ -1504,13 +1530,13 @@ async def analyze_stl(file: UploadFile = File(...), compare_gcode: UploadFile | 
         score = max(0, score)
 
         mesh_quality = STLMeshQuality(
-            vertex_count=len(mesh.vertices),
+            vertex_count=len(getattr(mesh, "vertices", [])),
             face_count=face_count,
             edge_count=len(edges),
             is_watertight=is_watertight,
             is_manifold=is_manifold,
-            volume_cm3=float(mesh.volume / 1000),  # mm³ to cm³
-            surface_area_cm2=float(mesh.area / 100),  # mm² to cm²
+            volume_cm3=float(getattr(mesh, "volume", 0.0) / 1000),  # mm³ to cm³
+            surface_area_cm2=float(getattr(mesh, "area", 0.0) / 100),  # mm² to cm²
             bounding_box_mm=bbox,
             mesh_quality_score=round(score, 1),
             triangle_quality_mean=round(triangle_quality_mean, 3),
@@ -1553,7 +1579,11 @@ async def analyze_stl(file: UploadFile = File(...), compare_gcode: UploadFile | 
                 reconstructed_array = np.array(reconstructed_points)
 
                 # Calculate Hausdorff distance
-                stl_points = mesh.sample(min(len(reconstructed_array), 5000))
+                # sample guarded for meshes lacking sample()
+                try:
+                    stl_points = mesh.sample(min(len(reconstructed_array), 5000))
+                except Exception:
+                    stl_points = np.array(getattr(mesh, "vertices", []))[:5000]
                 hausdorff_fwd = directed_hausdorff(stl_points, reconstructed_array)[0]
                 hausdorff_back = directed_hausdorff(reconstructed_array, stl_points)[0]
                 hausdorff_distance = max(hausdorff_fwd, hausdorff_back)
