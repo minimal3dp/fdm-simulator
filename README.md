@@ -196,6 +196,34 @@ Filament Cost ($/kg): Enter your spool cost.
 
 All simulation and optimization results will automatically include Estimated Cost and Estimated Print Time.
 
+## Documentation
+
+### Model Documentation Pages
+
+Comprehensive documentation for all 9 prediction models is available in the `docs/models/` directory:
+
+- **[Model Index](docs/models/index.html)** - Overview of all models with quick reference
+- **Individual Model Pages:**
+  - [Kaggle Model](docs/models/kaggle-model.html) - Tensile strength, surface roughness, elongation
+  - [C3 Model](docs/models/c3-model.html) - Advanced mechanical properties with raster effects
+  - [FEA Material Card](docs/models/fea-model.html) - Anisotropic elastic properties for simulation
+  - [Fatigue Lifetime](docs/models/fatigue-model.html) - Cycles to failure predictions
+  - [Dimensional Accuracy](docs/models/accuracy-model.html) - Geometric deviation analysis
+  - [Warpage Model](docs/models/warpage-model.html) - Thermal distortion prediction
+  - [Hardness Model](docs/models/hardness-model.html) - Shore D surface hardness
+  - [Multi-Material Bond](docs/models/multimaterial-model.html) - Interfacial adhesion strength
+  - [Composite Filaments](docs/models/composite-model.html) - Carbon/Glass fiber reinforced materials
+
+Each page includes:
+- Research foundations and dataset sources
+- Detailed parameter explanations with ranges and best practices
+- Output interpretation guidelines with real-world context
+- Use case recommendations
+- Tips for maximizing performance
+- Model limitations and caveats
+
+Access documentation directly from the simulator UI via the **"Model Documentation"** button in the header.
+
 ## Developer guide
 
 ### Linting & formatting (ruff) with pre-commit
